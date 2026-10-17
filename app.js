@@ -612,32 +612,105 @@ async function loadCustomerInbox() {
   ).join("");
 }
 
+
 async function loadAdminNotifications() {
   const box = $("adminNotifications");
   if (!box || !sb || !user) return;
+
   const { data, error } = await sb
     .from("notifications")
     .select("id,title,message,type,order_id,read_at,created_at")
     .eq("recipient_user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(50);
+
   if (error) {
-    box.innerHTML = `<p class="notificationEmpty">Notifications need the supplied database migration. ${esc( error.message )}</p>`;
+    box.innerHTML = `<p class="notificationEmpty">Could not load notifications: ${esc(error.message)}</p>`;
     return;
   }
-  const unread = (data || []).filter((n) => !n.read_at).length;
-  if ($("adminUnreadCount")) $("adminUnreadCount").textContent = String(unread);
-  if (!data?.length) {
-    box.innerHTML = `<p class="notificationEmpty">No admin notifications yet. New orders and customer payment reports will appear here.</p>`;
+
+  const notifications = data || [];
+  const unread = notifications.filter(n => !n.read_at).length;
+
+  if ($("adminUnreadCount")) {
+    $("adminUnreadCount").textContent = String(unread);
+  }
+
+  const clearAllButton = notifications.length
+    ? `<button class="secondary" type="button" data-clear-all-admin-notifications>Clear All Notifications</button>`
+    : "";
+
+  if (!notifications.length) {
+    box.innerHTML = `
+      ${clearAllButton}
+      <p class="notificationEmpty">No admin notifications yet.</p>
+    `;
     return;
   }
-  box.innerHTML = data
-    .map(
-      (n) =>
-        `<article class="notificationItem ${ n.read_at ? "" : "unread" }"><span aria-hidden="true">${ n.type === "new_order" ? "🛍️" : n.type === "payment_reported" ? "💳" : "🔔" }</span><div class="notificationText"><b>${esc(n.title)}</b><p>${esc( n.message )}</p><small>${new Date(n.created_at).toLocaleString()}</small></div>${ n.order_id ? `<button class="secondary" type="button" data-order="${n.order_id}">Open order</button>` : "" }${ n.read_at ? "" : `<button class="secondary" type="button" data-read-notification="${n.id}">Mark read</button>` }</article>`
-    )
-    .join("");
+
+  box.innerHTML = `
+    <div class="adminNotificationActions">
+      ${clearAllButton}
+    </div>
+    ${notifications.map(n => `
+      <article class="notificationItem ${n.read_at ? "" : "unread"}">
+        <span aria-hidden="true">${
+          n.type === "new_order" ? "🛍️" :
+          n.type === "payment_reported" ? "💳" : "🔔"
+        }</span>
+        <div class="notificationText">
+          <b>${esc(n.title)}</b>
+          <p>${esc(n.message)}</p>
+          <small>${new Date(n.created_at).toLocaleString()}</small>
+        </div>
+        ${n.order_id ? `<button class="secondary" type="button" data-order="${n.order_id}">Open order</button>` : ""}
+        ${!n.read_at ? `<button class="secondary" type="button" data-read-notification="${n.id}">Mark read</button>` : ""}
+        <button class="secondary" type="button" data-clear-admin-notification="${n.id}">Clear</button>
+      </article>
+    `).join("")}
+  `;
+
+  box.querySelectorAll("[data-clear-admin-notification]").forEach(button => {
+    button.onclick = () => clearAdminNotification(button.dataset.clearAdminNotification);
+  });
+
+  const clearAll = box.querySelector("[data-clear-all-admin-notifications]");
+  if (clearAll) clearAll.onclick = clearAllAdminNotifications;
 }
+
+async function clearAdminNotification(id) {
+  if (!confirm("Clear this notification only? The order and delivery history will remain.")) return;
+
+  const { error } = await sb
+    .from("notifications")
+    .delete()
+    .eq("id", id)
+    .eq("recipient_user_id", user.id);
+
+  if (error) {
+    alert("Could not clear notification: " + error.message);
+    return;
+  }
+
+  await loadAdminNotifications();
+}
+
+async function clearAllAdminNotifications() {
+  if (!confirm("Clear all notifications for your admin account? Orders and delivery history will remain.")) return;
+
+  const { error } = await sb
+    .from("notifications")
+    .delete()
+    .eq("recipient_user_id", user.id);
+
+  if (error) {
+    alert("Could not clear notifications: " + error.message);
+    return;
+  }
+
+  await loadAdminNotifications();
+}
+
 
 async function markNotificationRead(id) {
   const { error } = await sb
