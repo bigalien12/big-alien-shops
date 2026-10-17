@@ -260,9 +260,18 @@ function renderCart() {
     const qty = Math.min(stock || Number(item.qty) || 1, Number(item.qty) || 1);
     return `<div class="cartRow"><img src="${esc(imageOrFallback(item.image_url))}" alt="${esc(item.name)}"><div class="cartProductInfo" style="flex:1;min-width:100px"><b>${esc(item.name)}</b><div>${money(item.price)} × ${qty}</div><small class="muted">${stock} available</small></div><button class="secondary" type="button" data-minus="${esc(item.id)}" aria-label="Decrease ${esc(item.name)} quantity" ${qty <= 1 ? "disabled" : ""}>−</button><b aria-label="Quantity">${qty}</b><button class="secondary" type="button" data-plus="${esc(item.id)}" aria-label="Increase ${esc(item.name)} quantity" ${stock <= qty ? "" : ""}>+</button><button class="danger" type="button" data-remove="${esc(item.id)}">Remove</button></div>`;
   }).join("");
-  const total = cart.reduce((sum, item) => sum + (Number(item.price) || 0) * (Number(item.qty) || 0), 0);
-  $("cartSummary").innerHTML = `<h3>Total: ${money(total)}</h3><button class="primary" id="checkoutBtn" type="button">Proceed to Checkout</button>`;
-  saveCart();
+  const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+const shippingFee = 3000;
+const total = subtotal + shippingFee;
+
+$("cartSummary").innerHTML = `
+  <h3>Subtotal: ₦${subtotal.toLocaleString()}</h3>
+  <p>Shipping fee: ₦${shippingFee.toLocaleString()}</p>
+  <h3>Total: ₦${total.toLocaleString()}</h3>
+  <button class="primary" type="button" onclick="showView('checkoutView')">
+    Proceed to Checkout
+  </button>
+`;  saveCart();
 }
 function checkoutReportKey() {
   const cartKey = cart
