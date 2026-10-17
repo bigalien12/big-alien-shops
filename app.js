@@ -268,7 +268,7 @@ $("cartSummary").innerHTML = `
   <h3>Subtotal: ₦${subtotal.toLocaleString()}</h3>
   <p>Shipping fee: ₦${shippingFee.toLocaleString()}</p>
   <h3>Total: ₦${total.toLocaleString()}</h3>
-  <button class="primary" type="button" onclick="show('checkoutView')">
+  <button class="primary" type="button" id="goToCheckoutBtn">
     Proceed to Checkout
   </button>
 `;  saveCart();
@@ -1468,3 +1468,7 @@ setInterval(() => {
     loadAdminNotifications();
   }
 }, 30000);
+const goToCheckoutBtn = $("goToCheckoutBtn");
+if (goToCheckoutBtn) {
+  goToCheckoutBtn.onclick = () => show("checkoutView");
+}
