@@ -680,19 +680,78 @@ async function loadAdminProducts() {
   ).innerHTML = `<div class="adminTable"><div class="adminRow"><b>Image</b><b>Product</b><b>Price</b><b>Stock</b><b>Status</b><b>Actions</b></div>${rows}</div>`;
 }
 async function loadAdminOrders() {
-  let { data, error } = await sb
+  const box = $("adminOrders");
+
+  const { data: orders, error } = await sb
     .from("orders")
     .select("*")
     .order("created_at", { ascending: false });
-  if (error)
-    return ($("adminOrders").innerHTML = `<div class="summary">${esc( error.message )}</div>`);
-  $("adminOrders").innerHTML =
-    (data || [])
-      .map(
-        (o) =>
-          `<div class="orderCard"><b>Order ${o.id.slice(0, 8)}</b><p>${esc( o.customer_name )} · ${esc(o.customer_phone)} · ${money( o.total )}</p><p>Payment: <span class="status">${esc( o.payment_status )}</span> · Shipment: <span class="status">${esc( o.order_status )}</span></p><p>Address: ${esc( o.delivery_address )}</p><button class="primary" data-order="${ o.id }">Manage Order</button></div>`
-      )
-      .join("") || `<div class="summary">No orders.</div>`;
+
+  if (error) {
+    box.innerHTML = `<div class="summary">Could not load orders: ${esc(error.message)}</div>`;
+    return;
+  }
+
+  if (!orders || !orders.length) {
+    box.innerHTML = `<div class="summary">No orders yet.</div>`;
+    return;
+  }
+
+  const orderIds = orders.map((o) => o.id);
+
+  const { data: items, error: itemsError } = await sb
+    .from("order_items")
+    .select("*")
+    .in("order_id", orderIds);
+
+  const itemsByOrder = {};
+
+  (items || []).forEach((item) => {
+    if (!itemsByOrder[item.order_id]) {
+      itemsByOrder[item.order_id] = [];
+    }
+    itemsByOrder[item.order_id].push(item);
+  });
+
+  box.innerHTML = orders.map((o) => {
+    const orderItems = itemsByOrder[o.id] || [];
+
+    const productsHtml = itemsError
+      ? `<p class="summary">Could not load ordered products: ${esc(itemsError.message)}</p>`
+      : orderItems.length
+        ? `<h4>Ordered Products</h4>
+           ${orderItems.map((item) => `
+             <div class="adminOrderItem">
+               <b>${esc(item.product_name || "Product")}</b>
+               <p>Quantity: ${Number(item.quantity) || 0}</p>
+               <p>Unit price: ${money(item.product_price)}</p>
+               <p>Line total: ${money(
+                 (Number(item.product_price) || 0) *
+                 (Number(item.quantity) || 0)
+               )}</p>
+             </div>
+           `).join("")}`
+        : `<p class="muted">No product items were found for this order.</p>`;
+
+    return `
+      <div class="orderCard">
+        <b>Order ${esc(String(o.id).slice(0, 8))}</b>
+        <p>${esc(o.customer_name)} · ${esc(o.customer_phone)} · ${money(o.total)}</p>
+        <p>Payment:
+          <span class="status">${esc(o.payment_status)}</span>
+          · Shipment:
+          <span class="status">${esc(o.order_status)}</span>
+        </p>
+        <p><b>Delivery address:</b><br>
+          ${esc(o.delivery_address || "No delivery address saved")}
+        </p>
+        ${productsHtml}
+        <button class="primary" data-order="${esc(o.id)}">
+          Manage Order
+        </button>
+      </div>
+    `;
+  }).join("");
 }
 function openProductModal(p = null) {
   $("productModalTitle").textContent = p ? "Edit Product" : "Add Product";
