@@ -582,52 +582,87 @@ function applyOrderFilter(filter) {
   });
 }
 
+
 async function loadCustomerNotifications() {
   const box = $("customerNotifications");
   if (!box || !sb || !user) return;
+
   const { data, error } = await sb
     .from("notifications")
     .select("id,title,message,type,order_id,read_at,created_at")
     .eq("recipient_user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(30);
+
   if (error) {
-    box.innerHTML = `<p class="notificationEmpty">Notifications are not configured yet. Run the supplied database migration first.</p>`;
+    box.innerHTML = `<p class="notificationEmpty">Notifications are not available right now.</p>`;
     return;
   }
-  if (!data?.length) {
-    box.innerHTML = `<p class="notificationEmpty">No notifications yet. Shipment updates from the admin will appear here.</p>`;
+
+  const visible = (data || []).filter((n) =>
+    n.type === "shipment_update" ||
+    (n.type === "new_order" && n.title === "New order placed")
+  );
+
+  if (!visible.length) {
+    box.innerHTML = `<p class="notificationEmpty">No notifications yet.</p>`;
     return;
   }
-  box.innerHTML = data
-    .map(
-      (n) =>
-        `<article class="notificationItem ${ n.read_at ? "" : "unread" }"><span aria-hidden="true">${ n.type === "shipment_update" ? "📦" : "🔔" }</span><div class="notificationText"><b>${esc(n.title)}</b><p>${esc( n.message )}</p><small>${new Date(n.created_at).toLocaleString()}</small></div>${ n.read_at ? "" : `<button class="secondary" type="button" data-read-notification="${n.id}">Mark read</button>` }</article>`
-    )
-    .join("");
+
+  box.innerHTML = visible.map((n) =>
+    `<article class="notificationItem ${n.read_at ? "" : "unread"}">
+      <span aria-hidden="true">${n.type === "shipment_update" ? "📦" : "🔔"}</span>
+      <div class="notificationText">
+        <b>${esc(n.title)}</b>
+        <p>${esc(n.message)}</p>
+        <small>${new Date(n.created_at).toLocaleString()}</small>
+      </div>
+      ${n.read_at ? "" : `<button class="secondary" type="button" data-read-notification="${n.id}">Mark read</button>`}
+    </article>`
+  ).join("");
 }
+
+
 
 async function loadCustomerInbox() {
   const box = $("customerInboxMessages");
   if (!box || !sb || !user) return;
+
   const { data, error } = await sb
     .from("notifications")
     .select("id,title,message,type,order_id,read_at,created_at")
     .eq("recipient_user_id", user.id)
     .order("created_at", { ascending: false })
     .limit(50);
+
   if (error) {
-    box.innerHTML = `<p class="notificationEmpty">Inbox is not available yet. Please check that the notifications database migration has been applied. ${esc(error.message)}</p>`;
+    box.innerHTML = `<p class="notificationEmpty">Inbox is not available right now.</p>`;
     return;
   }
-  if (!data?.length) {
-    box.innerHTML = `<p class="notificationEmpty">Your inbox is empty. Order and shipment messages from the store will appear here.</p>`;
+
+  const visible = (data || []).filter((n) =>
+    n.type === "shipment_update" ||
+    (n.type === "new_order" && n.title === "New order placed")
+  );
+
+  if (!visible.length) {
+    box.innerHTML = `<p class="notificationEmpty">Your inbox is empty.</p>`;
     return;
   }
-  box.innerHTML = data.map((n) =>
-    `<article class="notificationItem ${n.read_at ? "" : "unread"}"><span aria-hidden="true">${n.type === "shipment_update" ? "📦" : "🔔"}</span><div class="notificationText"><b>${esc(n.title)}</b><p>${esc(n.message)}</p><small>${new Date(n.created_at).toLocaleString()}</small></div>${n.read_at ? "" : `<button class="secondary" type="button" data-read-notification="${n.id}">Mark read</button>`}</article>`
+
+  box.innerHTML = visible.map((n) =>
+    `<article class="notificationItem ${n.read_at ? "" : "unread"}">
+      <span aria-hidden="true">${n.type === "shipment_update" ? "📦" : "🔔"}</span>
+      <div class="notificationText">
+        <b>${esc(n.title)}</b>
+        <p>${esc(n.message)}</p>
+        <small>${new Date(n.created_at).toLocaleString()}</small>
+      </div>
+      ${n.read_at ? "" : `<button class="secondary" type="button" data-read-notification="${n.id}">Mark read</button>`}
+    </article>`
   ).join("");
 }
+
 
 
 async function loadAdminNotifications() {
