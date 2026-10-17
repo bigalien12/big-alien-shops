@@ -247,16 +247,28 @@ async function manageOrder(id){
 
     if(error)return alert(error.message);
 
-    if($('mMessage').value.trim()){
-      const {error:e}=await sb.from('shipment_updates').insert({
-        order_id:id,
-        status:$('mStatus').value,
-        message:$('mMessage').value.trim(),
-        location:$('mLocation').value.trim()||null
-      });
-      if(e)return alert(e.message);
-    }
+    if ($('mMessage').value.trim()) {
+  const { error: e } = await sb.from('shipment_updates').insert({
+    order_id: id,
+    status: $('mStatus').value,
+    message: $('mMessage').value.trim(),
+    location: $('mLocation').value.trim() || null
+  });
 
+  if (e) return alert(e.message);
+
+  const { error: notifyError } = await sb
+    .from('notifications')
+    .insert({
+      recipient_user_id: o.user_id,
+      order_id: id,
+      title: 'Shipment update',
+      message: `Order ${id.slice(0, 8)}: ${$('mMessage').value.trim()}`,
+      type: 'shipment_update'
+    });
+
+  if (notifyError) return alert(notifyError.message);
+    }
     $('orderModal').classList.add('hidden');
     await loadOrders();
     alert('Order updated. The customer will see the new shipment status.');
