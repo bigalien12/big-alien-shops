@@ -457,7 +457,18 @@ async function submitOrder(e) {
     order_status: "processing",
     customer_name: $("coName").value.trim(),
     customer_phone: $("coPhone").value.trim(),
-    delivery_address: $("coAddress").value.trim(),
+    
+delivery_address: [
+  $("coCountry")?.value,
+  $("coState")?.value,
+  $("coLga")?.value,
+  $("coCity")?.value,
+  $("coStreet")?.value,
+  $("coBuilding")?.value,
+  $("coLandmark")?.value,
+  $("coPostal")?.value
+].filter(v => v && v.trim()).join(", "),
+
     notes: "Customer reported payment; awaiting admin verification.",
   };
   const { data: o, error } = await sb
