@@ -448,11 +448,19 @@ async function submitOrder(e) {
       "checkoutMsg",
       "Transfer payment and tap “I Have Paid” before placing your order."
     );
-  const total = cart.reduce((a, x) => a + x.price * x.qty, 0);
+  
+const subtotal = cart.reduce((a, x) => a + x.price * x.qty, 0);
+const shippingFee = 3000;
+const total = subtotal + shippingFee;
+  
   const payload = {
-    user_id: user.id,
-    total,
-    payment_method: "bank_transfer",
+    
+user_id: user.id,
+subtotal,
+shipping_fee: shippingFee,
+total,
+payment_method: "bank_transfer",
+    
     payment_status: "pending",
     order_status: "processing",
     customer_name: $("coName").value.trim(),
