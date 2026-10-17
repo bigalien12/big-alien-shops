@@ -74,12 +74,12 @@ async function loadNotifications(){
       </article>
     `).join('')}`;
 
-  box.querySelectorAll('[data-clear-admin-notification]').forEach(button=>{
-    button.onclick=()=>clearAdminNotification(button.dataset.clearAdminNotification);
-  });
+  box.querySelectorAll('[data-clear-admin-notification]').forEach(button => {
+  button.onclick = () => clearAdminNotification(button.dataset.clearAdminNotification);
+});
 
-  const clearAll=box.querySelector('[data-clear-all-admin-notifications]');
-  if(clearAll)clearAll.onclick=clearAllAdminNotifications;
+const clearAll = box.querySelector('[data-clear-all-admin-notifications]');
+if (clearAll) clearAll.onclick = clearAllAdminNotifications;
 }
 
 async function clearAdminNotification(id){
