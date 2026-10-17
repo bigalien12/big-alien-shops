@@ -389,9 +389,19 @@ async function reportCheckoutPayment() {
 }
 function prefillCheckout() {
   setupCheckoutPaymentGate();
+
   if (profile) {
     $("coName").value = profile.full_name || "";
     $("coPhone").value = profile.phone || "";
+  }
+
+  if ($("coAddress") && user) {
+    const savedAddress =
+      localStorage.getItem(`big_alien_address_${user.id}`) || "";
+
+    if (!$("coAddress").value.trim() && savedAddress) {
+      $("coAddress").value = savedAddress;
+    }
   }
 }
 function renderAccountCustomerName() {
