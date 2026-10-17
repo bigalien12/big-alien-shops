@@ -268,7 +268,7 @@ $("cartSummary").innerHTML = `
   <h3>Subtotal: ₦${subtotal.toLocaleString()}</h3>
   <p>Shipping fee: ₦${shippingFee.toLocaleString()}</p>
   <h3>Total: ₦${total.toLocaleString()}</h3>
-  <button class="primary" type="button" onclick="showView('checkoutView')">
+  <button class="primary" type="button" onclick="show('checkoutView')">
     Proceed to Checkout
   </button>
 `;  saveCart();
