@@ -168,10 +168,11 @@
       </form>
       <hr>
       <h4>Change Email Address</h4>
-      <p class="small muted">A confirmation link may be sent to your new email address before the change takes effect.</p>
+      <p class="small muted">We will send verification codes to your current and new email addresses.</p>
       <form id="changeEmailForm">
         <label>New email address<input id="newAccountEmail" type="email" autocomplete="email" required placeholder="new@email.com"></label>
         <button class="primary" type="submit">Update Email</button>
+        <div id="emailChangeMsg" class="msg" aria-live="polite"></div>
         
 <div id="emailOtpSection" hidden>
   <div class="emailOtpNotice">

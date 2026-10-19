@@ -1494,6 +1494,7 @@ document.querySelector(".brand").addEventListener("click", (e) => {
 });
 saveCart();
 bindAccountAndBottomNavigation();
+init();
 
 // Refresh the admin notification badge while the admin dashboard is open.
 setInterval(() => {
@@ -1523,185 +1524,196 @@ let pendingCurrentEmail = "";
 let emailOtpTimer = null;
 let emailOtpSeconds = 0;
 
-
-
 function startEmailOtpCountdown() {
+  if (!resendEmailOtpBtn || !emailOtpCountdown) return;
   clearInterval(emailOtpTimer);
   emailOtpSeconds = 60;
   resendEmailOtpBtn.disabled = true;
 
   const updateCountdown = () => {
-    emailOtpCountdown.textContent =
-      emailOtpSeconds > 0
-        ? `Resend code in ${emailOtpSeconds}s`
-        : "You can resend the code now.";
-
+    emailOtpCountdown.textContent = emailOtpSeconds > 0
+      ? `Resend codes in ${emailOtpSeconds}s`
+      : "You can resend the code now.";
     if (emailOtpSeconds <= 0) {
       clearInterval(emailOtpTimer);
       resendEmailOtpBtn.disabled = false;
       return;
     }
-
     emailOtpSeconds--;
   };
-
   updateCountdown();
   emailOtpTimer = setInterval(updateCountdown, 1000);
 }
 
 if (changeEmailForm) {
-  changeEmailForm.onsubmit = async (e) => {
+  changeEmailForm.addEventListener("submit", async (e) => {
     e.preventDefault();
+    const status = $("emailChangeMsg");
+    const setStatus = (text, ok = false) => {
+      if (status) {
+        status.textContent = text;
+        status.style.color = ok ? "#147a32" : "#b00020";
+      }
+    };
 
-    const msg = $("emailChangeMsg");
-    const newEmail = $("newAccountEmail").value.trim();
-const { data: userData, error: userError } = await sb.auth.getUser();
-
-if (userError || !userData.user) {
-  msg.textContent = "Please sign in again before changing your email.";
-  return;
-}
-
-pendingCurrentEmail = userData.user.email || "";
+    if (!sb) {
+      setStatus("The account service is not connected. Please refresh and try again.");
+      return;
+    }
+    const newEmail = $("newAccountEmail")?.value.trim().toLowerCase() || "";
     if (!newEmail) {
-      msg.textContent = "Please enter your new email address.";
+      setStatus("Please enter your new email address.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+      setStatus("Please enter a valid email address.");
       return;
     }
 
-    msg.textContent = "Sending verification code...";
+    setStatus("Checking your account…");
+    const { data: userData, error: userError } = await sb.auth.getUser();
+    if (userError || !userData?.user) {
+      setStatus("Please sign in again before changing your email.");
+      return;
+    }
+    pendingCurrentEmail = (userData.user.email || "").trim().toLowerCase();
+    if (!pendingCurrentEmail) {
+      setStatus("Could not read your current email. Please sign in again.");
+      return;
+    }
+    if (newEmail === pendingCurrentEmail) {
+      setStatus("That is already your current email address.");
+      return;
+    }
 
+    const submitButton = changeEmailForm.querySelector('button[type="submit"]');
+    if (submitButton) submitButton.disabled = true;
+    setStatus("Requesting email verification codes…");
     try {
-      const { error } = await sb.auth.updateUser({
-        email: newEmail
-      });
-
+      const { error } = await sb.auth.updateUser({ email: newEmail });
       if (error) {
-        msg.textContent = "Email update failed: " + error.message;
+        setStatus("Email update failed: " + error.message);
         return;
       }
 
       pendingEmailChange = newEmail;
-      emailOtpSection.hidden = false;
-      currentEmailOtpInput.value = "";
-newEmailOtpInput.value = "";
-      msg.textContent =
-        "Check " + newEmail + " for your 6-digit verification code.";
-
+      if (currentEmailForOtp) currentEmailForOtp.textContent = pendingCurrentEmail;
+      if (newEmailForOtp) newEmailForOtp.textContent = pendingEmailChange;
+      if (currentEmailOtpInput) currentEmailOtpInput.value = "";
+      if (newEmailOtpInput) newEmailOtpInput.value = "";
+      if (emailOtpSection) emailOtpSection.hidden = false;
+      setStatus("Check both email inboxes for the 6-digit verification codes.", true);
       startEmailOtpCountdown();
     } catch (error) {
-      msg.textContent = "Email update failed: " + error.message;
+      setStatus("Email update failed: " + (error?.message || String(error)));
+    } finally {
+      if (submitButton) submitButton.disabled = false;
     }
-  };
+  });
 }
 
 if (verifyEmailOtpBtn) {
-  verifyEmailOtpBtn.onclick = async () => {
-    const msg = $("emailChangeMsg");
-    const oldToken = currentEmailOtpInput.value.trim();
-    const newToken = newEmailOtpInput.value.trim();
+  verifyEmailOtpBtn.addEventListener("click", async () => {
+    const status = $("emailChangeMsg");
+    const setStatus = (text, ok = false) => {
+      if (status) {
+        status.textContent = text;
+        status.style.color = ok ? "#147a32" : "#b00020";
+      }
+    };
+    const oldToken = currentEmailOtpInput?.value.trim() || "";
+    const newToken = newEmailOtpInput?.value.trim() || "";
 
+    if (!sb) return setStatus("The account service is not connected. Refresh and try again.");
     if (!pendingCurrentEmail || !pendingEmailChange) {
-      msg.textContent = "Please request an email change first.";
+      setStatus("Please request an email change first.");
       return;
     }
-
-    if (!/^\d{6}$/.test(oldToken) ||
-        !/^\d{6}$/.test(newToken)) {
-      msg.textContent = "Enter both 6-digit codes.";
+    if (!/^\d{6}$/.test(oldToken) || !/^\d{6}$/.test(newToken)) {
+      setStatus("Enter both 6-digit verification codes.");
       return;
     }
 
     verifyEmailOtpBtn.disabled = true;
-    msg.textContent = "Verifying codes...";
-
+    setStatus("Verifying the code sent to your current email…");
     try {
       const { error: oldError } = await sb.auth.verifyOtp({
-        email: pendingCurrentEmail,
-        token: oldToken,
-        type: "email_change"
+        email: pendingCurrentEmail, token: oldToken, type: "email_change"
       });
-
       if (oldError) {
-        msg.textContent = "Current email code failed: " + oldError.message;
+        setStatus("Current email code failed: " + oldError.message);
         return;
       }
 
+      setStatus("Current email verified. Verifying the new email…");
       const { error: newError } = await sb.auth.verifyOtp({
-        email: pendingEmailChange,
-        token: newToken,
-        type: "email_change"
+        email: pendingEmailChange, token: newToken, type: "email_change"
       });
-
       if (newError) {
-        msg.textContent = "New email code failed: " + newError.message;
+        setStatus("New email code failed: " + newError.message + ". If the first code was accepted, request a fresh code and try again.");
         return;
       }
 
       const { data, error } = await sb.auth.getUser();
-
-      if (error || data.user?.email?.toLowerCase() !==
-          pendingEmailChange.toLowerCase()) {
-        msg.textContent =
-          "Codes accepted. Please refresh and check your account email.";
+      if (error || data?.user?.email?.toLowerCase() !== pendingEmailChange.toLowerCase()) {
+        setStatus("Verification was submitted, but the account email is not confirmed as changed yet. Refresh and check the account email.");
         return;
       }
 
-      msg.textContent = "Email address updated successfully.";
-      emailOtpSection.hidden = true;
+      setStatus("Email address updated successfully.", true);
+      if (emailOtpSection) emailOtpSection.hidden = true;
       pendingEmailChange = "";
       pendingCurrentEmail = "";
-      currentEmailOtpInput.value = "";
-      newEmailOtpInput.value = "";
+      if (currentEmailOtpInput) currentEmailOtpInput.value = "";
+      if (newEmailOtpInput) newEmailOtpInput.value = "";
+      if (emailOtpCountdown) emailOtpCountdown.textContent = "";
+      if (resendEmailOtpBtn) resendEmailOtpBtn.disabled = false;
       clearInterval(emailOtpTimer);
-      resendEmailOtpBtn.disabled = false;
-      emailOtpCountdown.textContent = "";
-      changeEmailForm.reset();
+      changeEmailForm?.reset();
+      await loadProfile();
     } catch (error) {
-      msg.textContent = "Verification failed: " + error.message;
+      setStatus("Verification failed: " + (error?.message || String(error)));
     } finally {
       verifyEmailOtpBtn.disabled = false;
     }
-  };
+  });
 }
 
 if (resendEmailOtpBtn) {
-  resendEmailOtpBtn.onclick = async () => {
-    const msg = $("emailChangeMsg");
-
-    if (!pendingEmailChange) {
-      msg.textContent = "Request an email change first.";
+  resendEmailOtpBtn.addEventListener("click", async () => {
+    const status = $("emailChangeMsg");
+    const setStatus = (text, ok = false) => {
+      if (status) {
+        status.textContent = text;
+        status.style.color = ok ? "#147a32" : "#b00020";
+      }
+    };
+    if (!sb || !pendingEmailChange) {
+      setStatus("Request an email change first.");
       return;
     }
-
     resendEmailOtpBtn.disabled = true;
-    msg.textContent = "Resending verification code...";
-
+    setStatus("Requesting a fresh verification code for the new email…");
     try {
-      const { error } = await sb.auth.resend({
-        type: "email_change",
-        email: pendingEmailChange
-      });
-
+      const { error } = await sb.auth.resend({ type: "email_change", email: pendingEmailChange });
       if (error) {
-        msg.textContent = "Could not resend code: " + error.message;
+        setStatus("Could not resend code: " + error.message);
         resendEmailOtpBtn.disabled = false;
         return;
       }
-
-      currentEmailOtpInput.value = "";
-newEmailOtpInput.value = "";
-      msg.textContent = "A new verification code has been requested.";
+      if (newEmailOtpInput) newEmailOtpInput.value = "";
+      setStatus("A fresh code was requested. Check the email inboxes and enter the valid codes.", true);
       startEmailOtpCountdown();
     } catch (error) {
-      msg.textContent = "Could not resend code: " + error.message;
+      setStatus("Could not resend code: " + (error?.message || String(error)));
       resendEmailOtpBtn.disabled = false;
     }
-  };
+  });
 }
 
 
 const changePasswordForm = $("changePasswordForm");
-init();
+
 if (changePasswordForm) {
   changePasswordForm.onsubmit = async (e) => {
     e.preventDefault();
