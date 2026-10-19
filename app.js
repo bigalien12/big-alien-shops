@@ -438,9 +438,14 @@ async function loadProfile() {
   prefillCheckout();
   $("profileName").value = data?.full_name || "";
   $("profilePhone").value = data?.phone || "";
+  if ($("accountNameSummary")) $("accountNameSummary").textContent = data?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || "Not added yet";
+  if ($("accountPhoneSummary")) $("accountPhoneSummary").textContent = data?.phone || "Not added yet";
+  if ($("accountEmailSummary")) $("accountEmailSummary").textContent = user?.email || "Not available";
   const addressKey = `big_alien_address_${user.id}`;
+  const savedAddressText = localStorage.getItem(addressKey) || "";
+  if ($("accountAddressSummary")) $("accountAddressSummary").textContent = savedAddressText || "Add your delivery address";
   if ($("savedAddress"))
-    $("savedAddress").value = localStorage.getItem(addressKey) || "";
+    $("savedAddress").value = savedAddressText;
   if ($("coAddress") && !$("coAddress").value)
     $("coAddress").value = localStorage.getItem(addressKey) || "";
   const adminBtn = $("adminBtn");
@@ -1028,13 +1033,23 @@ async function init() {
       }
     )
     .subscribe();
-  sb.auth.onAuthStateChange(async (_e, s) => {
+  sb.auth.onAuthStateChange(async (event, s) => {
     user = s?.user || null;
-    if (user) {
+    if (!user) {
+      show("authView");
+      return;
+    }
+    // Supabase emits USER_UPDATED when an email/password/profile changes.
+    // Do not throw the customer back to the marketplace during account work.
+    if (event === "USER_UPDATED" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") {
+      await loadProfile();
+      return;
+    }
+    if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
       await loadProfile();
       show("homeView");
       await loadProducts();
-    } else show("authView");
+    }
   });
 }
 // Immediate, explicit handlers for mobile navigation and account menu.

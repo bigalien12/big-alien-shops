@@ -11,6 +11,14 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Big Alien Venture">
   <link rel="stylesheet" href="styles.css">
+  <style>
+    .accountDetailsCard{background:var(--card,#fff);border:1px solid #dce5f5;border-radius:16px;padding:14px;margin:12px 0 18px;box-shadow:0 3px 12px #0b3b7a0d}
+    .accountAvatar{width:54px;height:54px;border-radius:50%;background:#eaf1ff;color:#075bea;display:grid;place-items:center;font-size:28px;margin-bottom:10px}
+    .accountDetailRow{display:flex;justify-content:space-between;gap:14px;padding:11px 0;border-top:1px solid #e7edf7;font-size:14px}
+    .accountDetailRow span{color:#65748b;flex:0 0 78px}.accountDetailRow b{text-align:right;overflow-wrap:anywhere;font-weight:600}
+    .pageBackBtn{margin:10px 0}.emailOtpNotice{background:#edf4ff;border-radius:10px;padding:8px 12px;color:#174b9b}
+    body.dark .accountDetailsCard{background:#1b2433;border-color:#35445b;color:#f3f6fc} body.dark .accountDetailRow{border-color:#35445b} body.dark .accountDetailRow span{color:#bdc9dc} body.dark .emailOtpNotice{background:#243752;color:#e5efff}
+  </style>
 </head>
 <body>
 <header class="top">
@@ -122,6 +130,13 @@
 
   <section id="profileView" class="hidden accountScreen">
     <div class="sectionHead"><div><h2>My Account</h2><p id="accountCustomerName" class="accountCustomerName" aria-live="polite">Welcome!</p><p class="muted">Manage your Big Alien Venture account</p></div></div>
+    <div class="accountDetailsCard">
+      <div class="accountAvatar" aria-hidden="true">👤</div>
+      <div class="accountDetailRow"><span>Name</span><b id="accountNameSummary">Not added yet</b></div>
+      <div class="accountDetailRow"><span>Phone</span><b id="accountPhoneSummary">Not added yet</b></div>
+      <div class="accountDetailRow"><span>Email</span><b id="accountEmailSummary">Loading…</b></div>
+      <div class="accountDetailRow"><span>Address</span><b id="accountAddressSummary">Add your delivery address</b></div>
+    </div>
     <div class="accountMenu">
       <button class="accountMenuRow" type="button" data-account-action="support"><span class="accountMenuIcon">ⓘ</span><span><b>Help &amp; Support</b><small>Call or WhatsApp customer service</small></span><span class="chevron">›</span></button>
       <button class="accountMenuRow" type="button" data-account-action="orders"><span class="accountMenuIcon">▣</span><span><b>Orders</b><small>Purchases and delivery status</small></span><span class="chevron">›</span></button>
