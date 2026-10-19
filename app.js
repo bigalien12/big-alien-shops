@@ -1583,7 +1583,8 @@ pendingCurrentEmail = userData.user.email || "";
 
       pendingEmailChange = newEmail;
       emailOtpSection.hidden = false;
-      emailOtpInput.value = "";
+      currentEmailOtpInput.value = "";
+newEmailOtpInput.value = "";
       msg.textContent =
         "Check " + newEmail + " for your 6-digit verification code.";
 
@@ -1597,57 +1598,65 @@ pendingCurrentEmail = userData.user.email || "";
 if (verifyEmailOtpBtn) {
   verifyEmailOtpBtn.onclick = async () => {
     const msg = $("emailChangeMsg");
-    const token = emailOtpInput.value.trim();
+    const oldToken = currentEmailOtpInput.value.trim();
+    const newToken = newEmailOtpInput.value.trim();
 
-    if (!pendingEmailChange) {
-      msg.textContent = "Enter your new email and request a code first.";
+    if (!pendingCurrentEmail || !pendingEmailChange) {
+      msg.textContent = "Please request an email change first.";
       return;
     }
 
-    if (!/^\d{6}$/.test(token)) {
-      msg.textContent = "Enter the 6-digit verification code.";
+    if (!/^\d{6}$/.test(oldToken) ||
+        !/^\d{6}$/.test(newToken)) {
+      msg.textContent = "Enter both 6-digit codes.";
       return;
     }
 
     verifyEmailOtpBtn.disabled = true;
-    msg.textContent = "Verifying code...";
+    msg.textContent = "Verifying codes...";
 
     try {
-      const { error } = await sb.auth.verifyOtp({
-        email: pendingEmailChange,
-        token,
+      const { error: oldError } = await sb.auth.verifyOtp({
+        email: pendingCurrentEmail,
+        token: oldToken,
         type: "email_change"
       });
 
-      if (error) {
-        msg.textContent = "Verification failed: " + error.message;
+      if (oldError) {
+        msg.textContent = "Current email code failed: " + oldError.message;
         return;
       }
 
-      const { data: verifiedData, error: userCheckError } =
-  await sb.auth.getUser();
+      const { error: newError } = await sb.auth.verifyOtp({
+        email: pendingEmailChange,
+        token: newToken,
+        type: "email_change"
+      });
 
-if (userCheckError) {
-  msg.textContent = "Code accepted, but could not confirm the email change. Please check your account.";
-  return;
-}
+      if (newError) {
+        msg.textContent = "New email code failed: " + newError.message;
+        return;
+      }
 
-const actualEmail = verifiedData.user?.email?.toLowerCase();
+      const { data, error } = await sb.auth.getUser();
 
-if (actualEmail !== pendingEmailChange.toLowerCase()) {
-  msg.textContent =
-    "The code was accepted, but your email has not changed yet. Check both your old and new email inboxes for verification.";
-  return;
-}
+      if (error || data.user?.email?.toLowerCase() !==
+          pendingEmailChange.toLowerCase()) {
+        msg.textContent =
+          "Codes accepted. Please refresh and check your account email.";
+        return;
+      }
 
-msg.textContent = "Email address updated successfully.";
-emailOtpSection.hidden = true;
-pendingEmailChange = "";
-emailOtpInput.value = "";
-clearInterval(emailOtpTimer);
-resendEmailOtpBtn.disabled = false;
-emailOtpCountdown.textContent = "";
-changeEmailForm.reset();
+      msg.textContent = "Email address updated successfully.";
+      emailOtpSection.hidden = true;
+      pendingEmailChange = "";
+      pendingCurrentEmail = "";
+      currentEmailOtpInput.value = "";
+      newEmailOtpInput.value = "";
+      clearInterval(emailOtpTimer);
+      resendEmailOtpBtn.disabled = false;
+      emailOtpCountdown.textContent = "";
+      changeEmailForm.reset();
     } catch (error) {
       msg.textContent = "Verification failed: " + error.message;
     } finally {
