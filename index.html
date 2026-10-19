@@ -24,6 +24,14 @@
 .accountSummaryCard{background:var(--card,#fff);border:1px solid #dfe5ef;border-radius:16px;padding:14px;margin:14px 0 20px;box-shadow:0 3px 12px #10264a0c}.accountAvatar{width:48px;height:48px;border-radius:50%;background:#edf4ff;display:grid;place-items:center;font-size:24px;margin-bottom:8px}.accountSummaryRow{display:flex;gap:12px;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid #e7eaf0;font-size:14px}.accountSummaryRow span{color:#687386}.accountSummaryRow b{max-width:65%;text-align:right;overflow-wrap:anywhere;color:var(--text,#202738)}.addressSummaryButton{width:100%;background:transparent;border-left:0;border-right:0;border-bottom:0;font:inherit;cursor:pointer}.accountPanel{max-width:720px;margin:10px auto}.accountPanel form{display:grid;gap:12px}.accountPanel input,.accountPanel select,.accountPanel textarea{max-width:100%;box-sizing:border-box}.accountBackBtn{margin:8px 0 12px}.dark .accountSummaryCard{background:#172033;border-color:#344057}.dark .accountSummaryRow{border-color:#344057}.dark .accountSummaryRow span,.dark .accountSummaryRow b{color:#f1f5fb}.dark .accountAvatar{background:#273b5c}
 </style>
 
+
+<style>
+.profilePhotoEditor{display:flex;flex-direction:column;align-items:flex-start;gap:10px;margin:12px 0 20px}
+.profilePhotoPreview,.accountAvatar{width:84px;height:84px;border-radius:50%;background:#edf4ff;border:2px solid #d7e5fa;display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:36px;color:#1769d2}
+.profilePhotoPreview img,.accountAvatar img{width:100%;height:100%;object-fit:cover;display:block}
+.accountDetailsCard .accountAvatar{margin-bottom:12px}
+</style>
+
 </head>
 <body>
 <header class="top">
@@ -136,25 +144,18 @@
   <section id="profileView" class="hidden accountScreen">
     <div class="sectionHead"><div><h2>My Account</h2><p id="accountCustomerName" class="accountCustomerName" aria-live="polite">Welcome!</p><p class="muted">Manage your Big Alien Venture account</p></div></div>
     <div class="accountDetailsCard">
-      <div class="accountAvatar" aria-hidden="true">👤</div>
+      <div class="accountAvatar" id="accountAvatarPreview" aria-label="Customer profile photo">👤</div>
       <div class="accountDetailRow"><span>Name</span><b id="accountNameSummary">Not added yet</b></div>
       <div class="accountDetailRow"><span>Phone</span><b id="accountPhoneSummary">Not added yet</b></div>
       <div class="accountDetailRow"><span>Email</span><b id="accountEmailSummary">Loading…</b></div>
       <div class="accountDetailRow"><span>Address</span><b id="accountAddressSummary">Add your delivery address</b></div>
-    </div>
-    <div class="accountSummaryCard">
-      <div class="accountAvatar" aria-hidden="true">👤</div>
-      <div class="accountSummaryRow"><span>Name</span><b id="accountNameSummary">Loading…</b></div>
-      <div class="accountSummaryRow"><span>Phone</span><b id="accountPhoneSummary">Loading…</b></div>
-      <div class="accountSummaryRow"><span>Email</span><b id="accountEmailSummary">Loading…</b></div>
-      <button class="accountSummaryRow addressSummaryButton" type="button" data-account-action="address"><span>Address</span><b id="accountAddressSummary">Loading…</b></button>
     </div>
     <div class="accountMenu">
       <button class="accountMenuRow" type="button" data-account-action="support"><span class="accountMenuIcon">ⓘ</span><span><b>Help &amp; Support</b><small>Call or WhatsApp customer service</small></span><span class="chevron">›</span></button>
       <button class="accountMenuRow" type="button" data-account-action="orders"><span class="accountMenuIcon">▣</span><span><b>Orders</b><small>Purchases and delivery status</small></span><span class="chevron">›</span></button>
       <button class="accountMenuRow" type="button" data-account-action="inbox"><span class="accountMenuIcon">✉</span><span><b>Customer Inbox</b><small>Messages and shipment notifications</small></span><span class="chevron">›</span></button>
       <button class="accountMenuRow" type="button" data-account-action="reviews"><span class="accountMenuIcon">☆</span><span><b>Ratings &amp; Reviews</b><small>Share feedback about your shopping</small></span><span class="chevron">›</span></button>
-      <button class="accountMenuRow" type="button" data-account-action="management"><span class="accountMenuIcon">▤</span><span><b>Account Management</b><small>Personal details and delivery address</small></span><span class="chevron">›</span></button>
+      <button class="accountMenuRow" type="button" data-account-action="management"><span class="accountMenuIcon">▤</span><span><b>Account Management</b><small>Profile photo, name and phone number</small></span><span class="chevron">›</span></button>
       <button class="accountMenuRow" type="button" data-account-action="personal"><span class="accountMenuIcon">♙</span><span><b>Personal Details</b><small>Update your name and phone number</small></span><span class="chevron">›</span></button>
       <button class="accountMenuRow" type="button" data-account-action="address"><span class="accountMenuIcon">⌖</span><span><b>Delivery Address</b><small>Manage your saved Nigerian address</small></span><span class="chevron">›</span></button>
       <button class="accountMenuRow" type="button" data-account-action="email"><span class="accountMenuIcon">✉</span><span><b>Email Address</b><small>Change and verify your email</small></span><span class="chevron">›</span></button>
@@ -183,77 +184,22 @@
   <section id="accountManagementView" class="accountSubscreen hidden">
     <button class="secondary accountBackBtn" type="button" data-account-back>← Back to My Account</button>
     <section id="accountManagementPanel" class="checkout accountPanel">
-      <h3>Account Management</h3>
+      <h2>Account Management</h2>
+      <p class="muted">Update your profile picture, name and phone number.</p>
       <form id="profileForm">
-        <label>Full name<input id="profileName" required></label>
-        <label>Phone<input id="profilePhone" required></label>
-        <fieldset class="addressFieldset"><legend>Saved delivery address</legend>
-      <label>Country<select id="profileCountry" autocomplete="country-name" required><option value="Nigeria" selected>Nigeria</option></select></label>
-      <label>State / FCT<select id="profileState" autocomplete="address-level1" required><option value="">Select state</option><option>Abia</option><option>Adamawa</option><option>Akwa Ibom</option><option>Anambra</option><option>Bauchi</option><option>Bayelsa</option><option>Benue</option><option>Borno</option><option>Cross River</option><option>Delta</option><option>Ebonyi</option><option>Edo</option><option>Ekiti</option><option>Enugu</option><option>FCT (Abuja)</option><option>Gombe</option><option>Imo</option><option>Jigawa</option><option>Kaduna</option><option>Kano</option><option>Katsina</option><option>Kebbi</option><option>Kogi</option><option>Kwara</option><option>Lagos</option><option>Nasarawa</option><option>Niger</option><option>Ogun</option><option>Ondo</option><option>Osun</option><option>Oyo</option><option>Plateau</option><option>Rivers</option><option>Sokoto</option><option>Taraba</option><option>Yobe</option><option>Zamfara</option></select></label>
-      <label>Local Government Area (LGA)<input id="profileLga" autocomplete="address-level2" placeholder="e.g. Obio/Akpor" required></label>
-      <label>City / Town<input id="profileCity" autocomplete="address-level2" placeholder="e.g. Port Harcourt" required></label>
-      <label>Street name<input id="profileStreet" autocomplete="address-line1" placeholder="Enter street name" required></label>
-      <label>House / Building / Flat number<input id="profileBuilding" placeholder="e.g. No. 12, Flat 3" required></label>
-      <label>Landmark (optional)<input id="profileLandmark" placeholder="Nearby landmark or bus stop"></label>
-      <label>Postal code (optional)<input id="profilePostal" inputmode="numeric" autocomplete="postal-code" placeholder="Postal code"></label>
-      <textarea id="savedAddress" class="serializedAddress" hidden></textarea>
-    </fieldset>
+        <div class="profilePhotoEditor">
+          <div id="profilePhotoPreview" class="profilePhotoPreview" aria-label="Profile photo preview">👤</div>
+          <label>Customer picture<input id="profilePhotoInput" type="file" accept="image/*"></label>
+          <button class="secondary" id="removeProfilePhotoBtn" type="button">Remove Photo</button>
+        </div>
+        <label>Full name<input id="profileName" autocomplete="name" required></label>
+        <label>Phone number<input id="profilePhone" type="tel" autocomplete="tel" required></label>
         <button class="primary" type="submit">Save Personal Details</button>
         <div id="profileMsg" class="msg" aria-live="polite"></div>
       </form>
-      <hr>
-      <h4>Change Email Address</h4>
-      <p class="small muted">We will send verification codes to your current and new email addresses.</p>
-      <form id="changeEmailForm">
-        <label>New email address<input id="newAccountEmail" type="email" autocomplete="email" required placeholder="new@email.com"></label>
-        <button class="primary" type="submit">Update Email</button>
-        <div id="emailChangeMsg" class="msg" aria-live="polite"></div>
-        
-<div id="emailOtpSection" hidden>
-  <div class="emailOtpNotice">
-    <p>For your security, enter the codes sent to both email addresses.</p>
-  </div>
-
-  <label>
-    Code sent to your current email
-    <small id="currentEmailForOtp" class="small muted"></small>
-    <input id="emailChangeOldOtp" type="text"
-      inputmode="numeric" autocomplete="one-time-code"
-      maxlength="6" pattern="[0-9]{6}"
-      placeholder="_ _ _ _ _ _">
-  </label>
-
-  <label>
-    Code sent to your new email
-    <small id="newEmailForOtp" class="small muted"></small>
-    <input id="emailChangeNewOtp" type="text"
-      inputmode="numeric" autocomplete="one-time-code"
-      maxlength="6" pattern="[0-9]{6}"
-      placeholder="_ _ _ _ _ _">
-  </label>
-
-  <button class="primary" id="verifyEmailOtpBtn" type="button">
-    Verify &amp; Update Email
-  </button>
-
-  <button id="resendEmailOtpBtn" type="button">
-    Resend Codes
-  </button>
-
-  <p id="emailOtpCountdown" class="small muted"></p>
-</div>
-        
-      </form>
-      <hr>
-      <h4>Change Password</h4>
-      <form id="changePasswordForm">
-        <label>New password<input id="newAccountPassword" type="password" autocomplete="new-password" minlength="6" required placeholder="At least 6 characters"></label>
-        <label>Confirm new password<input id="confirmAccountPassword" type="password" autocomplete="new-password" minlength="6" required placeholder="Enter the same password again"></label>
-        <button class="primary" type="submit">Update Password</button>
-        <div id="passwordChangeMsg" class="msg" aria-live="polite"></div>
-      </form>
     </section>
   </section>
+
   <section id="reviewsView" class="accountSubscreen hidden">
     <button class="secondary accountBackBtn" type="button" data-account-back>← Back to My Account</button>
     <section id="reviewsPanel" class="checkout accountPanel">

@@ -454,6 +454,15 @@ async function loadProfile() {
   if ($("accountNameSummary")) $("accountNameSummary").textContent = profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || "Add your name";
   if ($("accountPhoneSummary")) $("accountPhoneSummary").textContent = profile?.phone || user?.user_metadata?.phone || "Add your phone number";
   if ($("accountEmailSummary")) $("accountEmailSummary").textContent = user?.email || "Email unavailable";
+  const photoKey = `big_alien_profile_photo_${user.id}`;
+  const photoData = localStorage.getItem(photoKey) || "";
+  const paintPhoto = (id) => {
+    const el = $(id);
+    if (!el) return;
+    el.innerHTML = photoData ? `<img src="${photoData}" alt="Customer profile photo">` : "👤";
+  };
+  paintPhoto("profilePhotoPreview");
+  paintPhoto("accountAvatarPreview");
   const addressKey = `big_alien_address_${user.id}`;
   const savedAddressText = localStorage.getItem(addressKey) || "";
   if ($("accountAddressSummary")) $("accountAddressSummary").textContent = savedAddressText || "Add your delivery address";
@@ -1435,6 +1444,33 @@ $("profileForm").onsubmit = async (e) => {
   await loadProfile();
 };
 
+const profilePhotoInput = $("profilePhotoInput");
+if (profilePhotoInput) profilePhotoInput.addEventListener("change", () => {
+  const file = profilePhotoInput.files && profilePhotoInput.files[0];
+  if (!file) return;
+  if (!file.type.startsWith("image/")) { alert("Please choose an image file."); profilePhotoInput.value = ""; return; }
+  if (file.size > 2 * 1024 * 1024) { alert("Please choose a photo smaller than 2 MB."); profilePhotoInput.value = ""; return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    if (!user || typeof reader.result !== "string") return;
+    try {
+      localStorage.setItem(`big_alien_profile_photo_${user.id}`, reader.result);
+      const paint = (id) => { const el = $(id); if (el) el.innerHTML = `<img src="${reader.result}" alt="Customer profile photo">`; };
+      paint("profilePhotoPreview"); paint("accountAvatarPreview");
+      msg("profileMsg", "Profile photo updated on this device.", true);
+    } catch (err) {
+      alert("This photo is too large to save on this device. Please choose a smaller photo.");
+    }
+  };
+  reader.readAsDataURL(file);
+});
+if ($("removeProfilePhotoBtn")) $("removeProfilePhotoBtn").addEventListener("click", () => {
+  if (!user) return;
+  localStorage.removeItem(`big_alien_profile_photo_${user.id}`);
+  ["profilePhotoPreview", "accountAvatarPreview"].forEach(id => { const el = $(id); if (el) el.textContent = "👤"; });
+  if ($("profileMsg")) msg("profileMsg", "Profile photo removed.", true);
+});
+
 if ($("adminNotificationsBtn"))
   $("adminNotificationsBtn").onclick = async () => {
     const panel = $("adminNotificationsPanel");
@@ -1456,38 +1492,12 @@ applyTheme(localStorage.getItem("big_alien_dark_mode") === "1");
 
 // Move each existing working account form onto its own screen without cloning IDs.
 function arrangeAccountSettingsScreens() {
-  const profileForm = $("profileForm");
-  const addressFieldset = profileForm?.querySelector(".addressFieldset");
-  if (profileForm && addressFieldset) {
-    const nameLabel = profileForm.querySelector('label:has(#profileName)');
-    const phoneLabel = profileForm.querySelector('label:has(#profilePhone)');
-    const saveButton = profileForm.querySelector('button[type="submit"]');
-    const status = $("profileMsg");
-    const personalSlot = $("personalFormSlot");
-    const addressSlot = $("addressFormSlot");
-    if (personalSlot && nameLabel && phoneLabel) {
-      const personalForm = document.createElement("form");
-      personalForm.id = "personalDetailsForm";
-      personalForm.append(nameLabel, phoneLabel);
-      const personalSave = document.createElement("button"); personalSave.type = "submit"; personalSave.className = "primary"; personalSave.textContent = "Save Personal Details";
-      const personalMsg = document.createElement("div"); personalMsg.id = "personalDetailsMsg"; personalMsg.className = "msg"; personalMsg.setAttribute("aria-live", "polite");
-      personalForm.append(personalSave, personalMsg); personalSlot.append(personalForm);
-      personalForm.addEventListener("submit", async (e) => { e.preventDefault(); if (!user || !sb) return msg("personalDetailsMsg", "Please sign in again."); const payload={full_name:$("profileName").value.trim(),phone:$("profilePhone").value.trim()}; const {error}=await sb.from("profiles").upsert({id:user.id,...payload},{onConflict:"id"}); if(error)return msg("personalDetailsMsg",error.message); profile={...(profile||{}),...payload}; msg("personalDetailsMsg","Personal details saved.",true); await loadProfile(); });
-    }
-    if (addressSlot) {
-      const addressForm = document.createElement("form"); addressForm.id = "deliveryAddressForm";
-      addressForm.append(addressFieldset);
-      const save = document.createElement("button"); save.type="submit"; save.className="primary"; save.textContent="Save Delivery Address";
-      const statusEl = document.createElement("div"); statusEl.id="deliveryAddressMsg"; statusEl.className="msg"; statusEl.setAttribute("aria-live","polite");
-      addressForm.append(save,statusEl); addressSlot.append(addressForm);
-      addressForm.addEventListener("submit", async (e)=>{e.preventDefault(); if(!user)return msg("deliveryAddressMsg","Please sign in again."); const vals=["profileCountry","profileState","profileLga","profileCity","profileStreet","profileBuilding","profileLandmark","profilePostal"].map(id=>$(id)?.value.trim()||""); if(vals.slice(0,6).some(v=>!v))return msg("deliveryAddressMsg","Please complete the required address fields."); const address= [vals[3], vals[4], vals[5], vals[6], vals[2], vals[1], vals[0], vals[7]].filter(Boolean).join(", "); localStorage.setItem(`big_alien_address_${user.id}`,address); if($("savedAddress"))$("savedAddress").value=address; if($("coAddress"))$("coAddress").value=address; if($("accountAddressSummary"))$("accountAddressSummary").textContent=address; msg("deliveryAddressMsg","Delivery address saved.",true); });
-    }
-    // The legacy account-management page remains available, but the new menu routes to focused screens.
-    if (saveButton) saveButton.remove(); if (status) status.remove();
-  }
-  const emailForm=$("changeEmailForm"); if(emailForm && $("emailFormSlot")) $("emailFormSlot").append(emailForm);
-  const passwordForm=$("changePasswordForm"); if(passwordForm && $("passwordFormSlot")) $("passwordFormSlot").append(passwordForm);
+  const emailForm = $("changeEmailForm");
+  if (emailForm && $("emailFormSlot")) $("emailFormSlot").append(emailForm);
+  const passwordForm = $("changePasswordForm");
+  if (passwordForm && $("passwordFormSlot")) $("passwordFormSlot").append(passwordForm);
 }
+
 arrangeAccountSettingsScreens();
 
 if ($("darkModeToggle"))
