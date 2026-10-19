@@ -1698,10 +1698,10 @@ newEmailOtpInput.value = "";
     }
   };
 }
-init();
+
 
 const changePasswordForm = $("changePasswordForm");
-
+init();
 if (changePasswordForm) {
   changePasswordForm.onsubmit = async (e) => {
     e.preventDefault();
