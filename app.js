@@ -392,7 +392,7 @@ async function reportCheckoutPayment() {
     "notify_admins_checkout_event",
     {
       p_title: "Customer reported payment",
-      p_message: `${$("coName").value.trim()} (${ user.email || "no email" }) reports a transfer of ${money( amount )}. Check Moniepoint before confirming.`,
+      p_message: `${$("coName").value.trim()} (${ $("coEmail")?.value.trim() || user.email || "no email" }) reports a transfer of ${money( amount )}. Check Moniepoint before confirming.`,
       p_type: "payment_reported",
       p_order_id: null,
     }
@@ -410,21 +410,31 @@ async function reportCheckoutPayment() {
 }
 function prefillCheckout() {
   setupCheckoutPaymentGate();
-
   if (profile) {
-    $("coName").value = profile.full_name || "";
-    $("coPhone").value = profile.phone || "";
+    if ($("coName") && !$("coName").value.trim()) $("coName").value = profile.full_name || "";
+    if ($("coPhone") && !$("coPhone").value.trim()) $("coPhone").value = profile.phone || "";
   }
-
-  if ($("coAddress") && user) {
-    const savedAddress =
-      localStorage.getItem(`big_alien_address_${user.id}`) || "";
-
-    if (!$("coAddress").value.trim() && savedAddress) {
-      $("coAddress").value = savedAddress;
-    }
+  if ($("coEmail") && user && !$("coEmail").value.trim()) {
+    $("coEmail").value = user.email || "";
+  }
+  const savedAddress = user ? (localStorage.getItem(`big_alien_address_${user.id}`) || "") : "";
+  if ($("coAddress") && !$("coAddress").value.trim() && savedAddress) {
+    $("coAddress").value = savedAddress;
+  }
+  const emailToggle = $("useDifferentCheckoutEmail");
+  const emailInput = $("coEmail");
+  if (emailToggle && emailInput && !emailToggle.dataset.bound) {
+    emailToggle.dataset.bound = "1";
+    emailToggle.addEventListener("change", () => {
+      if (!emailToggle.checked && user?.email) emailInput.value = user.email;
+      emailInput.readOnly = !emailToggle.checked;
+      emailInput.required = true;
+      if (emailToggle.checked) emailInput.focus();
+    });
+    emailInput.readOnly = !emailToggle.checked;
   }
 }
+
 function renderAccountCustomerName() {
   const el = $("accountCustomerName");
   if (!el) return;
@@ -454,55 +464,12 @@ async function loadProfile() {
   if ($("accountNameSummary")) $("accountNameSummary").textContent = profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || "Add your name";
   if ($("accountPhoneSummary")) $("accountPhoneSummary").textContent = profile?.phone || user?.user_metadata?.phone || "Add your phone number";
   if ($("accountEmailSummary")) $("accountEmailSummary").textContent = user?.email || "Email unavailable";
-  // Keep the current photo visible while refreshing a private signed URL.
-  // Reuse a valid URL during normal navigation to avoid avatar flicker.
-  const photoUserId = user.id;
-  const photoPath = user.user_metadata?.avatar_path || "";
-  window.bigAlienProfilePhotoCache = window.bigAlienProfilePhotoCache || null;
-  let photoUrl = "";
-  const cachedPhoto = window.bigAlienProfilePhotoCache;
-  if (photoPath && cachedPhoto && cachedPhoto.userId === photoUserId &&
-      cachedPhoto.path === photoPath && cachedPhoto.expiresAt > Date.now() + 60000) {
-    photoUrl = cachedPhoto.url;
-  } else if (photoPath && sb) {
-    const { data: signedPhoto, error: signedPhotoError } = await sb.storage
-      .from("profile-photos")
-      .createSignedUrl(photoPath, 3600);
-    // Do not let a slower request for an old account overwrite the current avatar.
-    if (user?.id === photoUserId && user?.user_metadata?.avatar_path === photoPath) {
-      if (signedPhotoError) {
-        console.warn("Could not load private profile photo:", signedPhotoError.message);
-      } else {
-        photoUrl = signedPhoto?.signedUrl || "";
-        if (photoUrl) window.bigAlienProfilePhotoCache = {
-          userId: photoUserId, path: photoPath, url: photoUrl,
-          expiresAt: Date.now() + 50 * 60 * 1000
-        };
-      }
-    }
-  }
+  const photoKey = `big_alien_profile_photo_${user.id}`;
+  const photoData = localStorage.getItem(photoKey) || "";
   const paintPhoto = (id) => {
     const el = $(id);
     if (!el) return;
-    if (!photoPath) {
-      el.textContent = "👤";
-      return;
-    }
-    // If a photo is already displayed, never replace it with a blank/default
-    // while a refreshed signed URL is being fetched or an image is loading.
-    if (!photoUrl) return;
-    const currentImg = el.querySelector("img");
-    if (currentImg && currentImg.dataset.photoPath === photoPath && currentImg.src === photoUrl) return;
-    const nextImg = document.createElement("img");
-    nextImg.alt = "Your private profile photo";
-    nextImg.dataset.photoPath = photoPath;
-    nextImg.onload = () => {
-      if (user?.id === photoUserId && user?.user_metadata?.avatar_path === photoPath) {
-        el.replaceChildren(nextImg);
-      }
-    };
-    nextImg.onerror = () => { /* Keep the previous visible photo on a transient error. */ };
-    nextImg.src = photoUrl;
+    el.innerHTML = photoData ? `<img src="${photoData}" alt="Customer profile photo">` : "👤";
   };
   paintPhoto("profilePhotoPreview");
   paintPhoto("accountAvatarPreview");
@@ -544,19 +511,8 @@ payment_method: "bank_transfer",
     order_status: "processing",
     customer_name: $("coName").value.trim(),
     customer_phone: $("coPhone").value.trim(),
-    
-delivery_address: [
-  $("coCountry")?.value,
-  $("coState")?.value,
-  $("coLga")?.value,
-  $("coCity")?.value,
-  $("coStreet")?.value,
-  $("coBuilding")?.value,
-  $("coLandmark")?.value,
-  $("coPostal")?.value
-].filter(v => v && v.trim()).join(", "),
-
-    notes: "Customer reported payment; awaiting admin verification.",
+    delivery_address: $("coAddress").value.trim(),
+    notes: `Contact email for this order: ${$("coEmail").value.trim()}. Customer reported payment; awaiting admin verification.` ,
   };
   const { data: o, error } = await sb
     .from("orders")
@@ -953,6 +909,7 @@ async function loadAdminOrders() {
       <div class="orderCard">
         <b>Order ${esc(String(o.id).slice(0, 8))}</b>
         <p>${esc(o.customer_name)} · ${esc(o.customer_phone)} · ${money(o.total)}</p>
+        <p><b>Order contact email:</b> ${esc((o.notes || "").match(/Contact email for this order:\s*([\s\S]*?)\. Customer reported payment/i)?.[1] || "Not saved on this order")}</p>
         <p>Payment:
           <span class="status">${esc(o.payment_status)}</span>
           · Shipment:
@@ -1029,7 +986,7 @@ async function manageOrder(id) {
     .select("*")
     .eq("order_id", id)
     .order("created_at", { ascending: false });
-  $("orderModalBody").innerHTML = `<h2>Manage Order ${id.slice( 0, 8 )}</h2><p>${esc(o.customer_name)} · ${esc(o.customer_phone)}</p><p>${esc( o.delivery_address )}</p><label>Payment status<select id="mPay"><option ${ o.payment_status === "pending" ? "selected" : "" }>pending</option><option ${ o.payment_status === "paid" ? "selected" : "" }>paid</option><option ${ o.payment_status === "failed" ? "selected" : "" }>failed</option><option ${ o.payment_status === "refunded" ? "selected" : "" }>refunded</option></select></label><label>Shipment status<select id="mStatus">${[ "processing", "confirmed", "shipped", "out_for_delivery", "ready_for_collection", "delivered", "cancelled", ] .map( (s) => `<option ${o.order_status === s ? "selected" : ""}>${s}</option>` ) .join( "" )}</select></label><label>Tracking number<input id="mTrack" value="${esc( o.tracking_number || "" )}"></label><label>Shipment message<textarea id="mMessage" placeholder="e.g. Package has left Abuja sorting centre"></textarea></label><label>Location<input id="mLocation" placeholder="e.g. Abuja"></label><button class="primary" id="saveOrder">Save Update</button><h3>History</h3>${( ups || [] ) .map( (u) => `<div>📍 <b>${esc(u.status)}</b> — ${esc(u.message)} (${new Date( u.created_at ).toLocaleString()})</div>` ) .join("")}`;
+  $("orderModalBody").innerHTML = `<h2>Manage Order ${id.slice( 0, 8 )}</h2><p>${esc(o.customer_name)} · ${esc(o.customer_phone)}</p><p><b>Order contact email:</b> ${esc((o.notes || "").match(/Contact email for this order:\s*([\s\S]*?)\. Customer reported payment/i)?.[1] || "Not saved on this order")}</p><p>${esc( o.delivery_address )}</p><label>Payment status<select id="mPay"><option ${ o.payment_status === "pending" ? "selected" : "" }>pending</option><option ${ o.payment_status === "paid" ? "selected" : "" }>paid</option><option ${ o.payment_status === "failed" ? "selected" : "" }>failed</option><option ${ o.payment_status === "refunded" ? "selected" : "" }>refunded</option></select></label><label>Shipment status<select id="mStatus">${[ "processing", "confirmed", "shipped", "out_for_delivery", "ready_for_collection", "delivered", "cancelled", ] .map( (s) => `<option ${o.order_status === s ? "selected" : ""}>${s}</option>` ) .join( "" )}</select></label><label>Tracking number<input id="mTrack" value="${esc( o.tracking_number || "" )}"></label><label>Shipment message<textarea id="mMessage" placeholder="e.g. Package has left Abuja sorting centre"></textarea></label><label>Location<input id="mLocation" placeholder="e.g. Abuja"></label><button class="primary" id="saveOrder">Save Update</button><h3>History</h3>${( ups || [] ) .map( (u) => `<div>📍 <b>${esc(u.status)}</b> — ${esc(u.message)} (${new Date( u.created_at ).toLocaleString()})</div>` ) .join("")}`;
   $("saveOrder").onclick = async () => {
     let pay = $("mPay").value,
       status = $("mStatus").value,
@@ -1164,8 +1121,7 @@ function bindAccountAndBottomNavigation() {
         return;
       }
       const viewId =
-        // Personal Details uses the same working name/phone/photo form as Account Management.
-        action === "personal" ? "accountManagementView"
+        action === "personal" ? "personalDetailsView"
           : action === "address" ? "deliveryAddressView"
           : action === "email" ? "emailSettingsView"
           : action === "password" ? "passwordSettingsView"
@@ -1179,7 +1135,7 @@ function bindAccountAndBottomNavigation() {
         show(viewId);
         window.scrollTo({ top: 0, behavior: "auto" });
       }
-      if (action === "management" || action === "personal") loadProfile();
+      if (action === "management") loadProfile();
     });
   });
 }
@@ -1477,6 +1433,17 @@ $("search").oninput = () => {
   renderProducts();
 };
 $("checkoutForm").onsubmit = submitOrder;
+const savedAddressForm = $("savedAddressForm");
+if (savedAddressForm) savedAddressForm.onsubmit = (e) => {
+  e.preventDefault();
+  if (!user) return msg("addressMsg", "Please sign in again.");
+  const value = $("savedAddress").value.trim();
+  if (!value) return msg("addressMsg", "Please enter your full delivery address.");
+  localStorage.setItem(`big_alien_address_${user.id}`, value);
+  if ($("accountAddressSummary")) $("accountAddressSummary").textContent = value;
+  if ($("coAddress")) $("coAddress").value = value;
+  msg("addressMsg", "Delivery address saved for future orders.", true);
+};
 $("profileForm").onsubmit = async (e) => {
   e.preventDefault();
   if (!user || !sb) return msg("profileMsg", "Please sign in again.");
@@ -1489,83 +1456,30 @@ $("profileForm").onsubmit = async (e) => {
 };
 
 const profilePhotoInput = $("profilePhotoInput");
-if (profilePhotoInput) profilePhotoInput.addEventListener("change", async () => {
+if (profilePhotoInput) profilePhotoInput.addEventListener("change", () => {
   const file = profilePhotoInput.files && profilePhotoInput.files[0];
   if (!file) return;
-  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-  if (!allowedTypes.includes(file.type)) {
-    alert("Please choose a JPEG, PNG, or WebP image.");
-    profilePhotoInput.value = "";
-    return;
-  }
-  if (file.size > 2 * 1024 * 1024) {
-    alert("Please choose a photo smaller than 2 MB.");
-    profilePhotoInput.value = "";
-    return;
-  }
-  if (!user || !sb) {
-    msg("profileMsg", "Please sign in again before uploading a photo.");
-    profilePhotoInput.value = "";
-    return;
-  }
-  const extension = ({ "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" })[file.type];
-  const path = `${user.id}/avatar.${extension}`;
-  msg("profileMsg", "Uploading your private profile photo…", true);
-  profilePhotoInput.disabled = true;
-  try {
-    const { error: uploadError } = await sb.storage
-      .from("profile-photos")
-      .upload(path, file, { upsert: true, contentType: file.type });
-    if (uploadError) {
-      msg("profileMsg", "Photo upload failed: " + uploadError.message);
-      return;
+  if (!file.type.startsWith("image/")) { alert("Please choose an image file."); profilePhotoInput.value = ""; return; }
+  if (file.size > 2 * 1024 * 1024) { alert("Please choose a photo smaller than 2 MB."); profilePhotoInput.value = ""; return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    if (!user || typeof reader.result !== "string") return;
+    try {
+      localStorage.setItem(`big_alien_profile_photo_${user.id}`, reader.result);
+      const paint = (id) => { const el = $(id); if (el) el.innerHTML = `<img src="${reader.result}" alt="Customer profile photo">`; };
+      paint("profilePhotoPreview"); paint("accountAvatarPreview");
+      msg("profileMsg", "Profile photo updated on this device.", true);
+    } catch (err) {
+      alert("This photo is too large to save on this device. Please choose a smaller photo.");
     }
-    const { data: updatedData, error: metadataError } = await sb.auth.updateUser({
-      data: { avatar_path: path }
-    });
-    if (metadataError) {
-      msg("profileMsg", "Photo uploaded, but saving it to your account failed: " + metadataError.message);
-      return;
-    }
-    if (updatedData?.user) user = updatedData.user;
-    window.bigAlienProfilePhotoCache = null;
-    await loadProfile();
-    msg("profileMsg", "Profile photo saved securely to your account.", true);
-  } catch (error) {
-    msg("profileMsg", "Photo upload failed: " + (error?.message || String(error)));
-  } finally {
-    profilePhotoInput.disabled = false;
-    profilePhotoInput.value = "";
-  }
+  };
+  reader.readAsDataURL(file);
 });
-if ($("removeProfilePhotoBtn")) $("removeProfilePhotoBtn").addEventListener("click", async () => {
-  if (!user || !sb) return;
-  if (!user.user_metadata?.avatar_path) {
-    msg("profileMsg", "You have no profile photo to remove.");
-    return;
-  }
-  if (!confirm("Remove your profile photo?")) return;
-  const oldPath = user.user_metadata.avatar_path;
-  try {
-    const { error: removeError } = await sb.storage.from("profile-photos").remove([oldPath]);
-    if (removeError) {
-      msg("profileMsg", "Could not remove the stored photo. Check the bucket DELETE policy: " + removeError.message);
-      return;
-    }
-    const { data: updatedData, error: metadataError } = await sb.auth.updateUser({
-      data: { avatar_path: null }
-    });
-    if (metadataError) {
-      msg("profileMsg", "Photo file removed, but account update failed: " + metadataError.message);
-      return;
-    }
-    if (updatedData?.user) user = updatedData.user;
-    window.bigAlienProfilePhotoCache = null;
-    await loadProfile();
-    msg("profileMsg", "Profile photo removed.", true);
-  } catch (error) {
-    msg("profileMsg", "Could not remove photo: " + (error?.message || String(error)));
-  }
+if ($("removeProfilePhotoBtn")) $("removeProfilePhotoBtn").addEventListener("click", () => {
+  if (!user) return;
+  localStorage.removeItem(`big_alien_profile_photo_${user.id}`);
+  ["profilePhotoPreview", "accountAvatarPreview"].forEach(id => { const el = $(id); if (el) el.textContent = "👤"; });
+  if ($("profileMsg")) msg("profileMsg", "Profile photo removed.", true);
 });
 
 if ($("adminNotificationsBtn"))
@@ -1596,43 +1510,6 @@ function arrangeAccountSettingsScreens() {
 }
 
 arrangeAccountSettingsScreens();
-
-// Keep the existing account forms connected after they are moved into their
-// dedicated settings screens. The delivery address is stored per signed-in user.
-const savedAddressInput = $("savedAddress");
-const savedAddressForm = savedAddressInput?.closest("form");
-function saveCustomerAddress(event) {
-  if (event) event.preventDefault();
-  if (!user || !savedAddressInput) {
-    const status = $("addressMsg") || $("deliveryAddressMsg");
-    if (status) status.textContent = "Please sign in again before saving your address.";
-    else alert("Please sign in again before saving your address.");
-    return;
-  }
-  const address = savedAddressInput.value.trim();
-  if (!address) {
-    const status = $("addressMsg") || $("deliveryAddressMsg");
-    if (status) status.textContent = "Please enter your delivery address.";
-    else alert("Please enter your delivery address.");
-    return;
-  }
-  localStorage.setItem(`big_alien_address_${user.id}`, address);
-  if ($("accountAddressSummary")) $("accountAddressSummary").textContent = address;
-  if ($("coAddress")) $("coAddress").value = address;
-  const status = $("addressMsg") || $("deliveryAddressMsg");
-  if (status) {
-    status.textContent = "Delivery address saved successfully.";
-    status.style.color = "#147a32";
-  } else {
-    alert("Delivery address saved successfully.");
-  }
-}
-if (savedAddressForm) savedAddressForm.addEventListener("submit", saveCustomerAddress);
-// Support the existing save button even if the address input is not inside a form.
-["saveAddressBtn", "saveDeliveryAddressBtn", "updateAddressBtn"].forEach((id) => {
-  const button = $(id);
-  if (button) button.addEventListener("click", saveCustomerAddress);
-});
 
 if ($("darkModeToggle"))
   $("darkModeToggle").addEventListener("change", (e) =>
@@ -1939,11 +1816,6 @@ if (changePasswordForm) {
 
     if (password !== confirmPassword) {
       msg.textContent = "The passwords do not match.";
-      return;
-    }
-
-    if (!sb || !user) {
-      msg.textContent = "Please sign in again before changing your password.";
       return;
     }
 

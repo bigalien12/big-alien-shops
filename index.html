@@ -108,19 +108,15 @@
   <section id="checkoutView" class="hidden">
     <div class="sectionHead"><h2>Checkout</h2></div>
     <form id="checkoutForm" class="checkout">
-      <label>Full name<input id="coName" required></label>
-      <label>Phone<input id="coPhone" required></label>
+      <label>Full name<input id="coName" autocomplete="name" required></label>
+      <label>Phone number for delivery updates and confirmation<input id="coPhone" type="tel" autocomplete="tel" placeholder="e.g. 08012345678" required></label>
+      <label>Email for this order<input id="coEmail" type="email" autocomplete="email" required></label>
+      <label class="checkoutEmailChoice"><input type="checkbox" id="useDifferentCheckoutEmail"> Use a different email for this order</label>
+      <p class="small muted">Your account email will be used by default. Choosing another email here will not change your account email.</p>
       <fieldset class="addressFieldset"><legend>Delivery address</legend>
-      <label>Country<select id="coCountry" autocomplete="country-name" required><option value="Nigeria" selected>Nigeria</option></select></label>
-      <label>State / FCT<select id="coState" autocomplete="address-level1" required><option value="">Select state</option><option>Abia</option><option>Adamawa</option><option>Akwa Ibom</option><option>Anambra</option><option>Bauchi</option><option>Bayelsa</option><option>Benue</option><option>Borno</option><option>Cross River</option><option>Delta</option><option>Ebonyi</option><option>Edo</option><option>Ekiti</option><option>Enugu</option><option>FCT (Abuja)</option><option>Gombe</option><option>Imo</option><option>Jigawa</option><option>Kaduna</option><option>Kano</option><option>Katsina</option><option>Kebbi</option><option>Kogi</option><option>Kwara</option><option>Lagos</option><option>Nasarawa</option><option>Niger</option><option>Ogun</option><option>Ondo</option><option>Osun</option><option>Oyo</option><option>Plateau</option><option>Rivers</option><option>Sokoto</option><option>Taraba</option><option>Yobe</option><option>Zamfara</option></select></label>
-      <label>Local Government Area (LGA)<input id="coLga" autocomplete="address-level2" placeholder="e.g. Obio/Akpor" required></label>
-      <label>City / Town<input id="coCity" autocomplete="address-level2" placeholder="e.g. Port Harcourt" required></label>
-      <label>Street name<input id="coStreet" autocomplete="address-line1" placeholder="Enter street name" required></label>
-      <label>House / Building / Flat number<input id="coBuilding" placeholder="e.g. No. 12, Flat 3" required></label>
-      <label>Landmark (optional)<input id="coLandmark" placeholder="Nearby landmark or bus stop"></label>
-      <label>Postal code (optional)<input id="coPostal" inputmode="numeric" autocomplete="postal-code" placeholder="Postal code"></label>
-      <textarea id="coAddress" class="serializedAddress" hidden></textarea>
-    </fieldset>
+        <label>Full delivery address in Nigeria<textarea id="coAddress" rows="4" autocomplete="street-address" placeholder="House/building/flat number, street, area, LGA, city, state, Nigeria" required></textarea></label>
+        <p class="small muted">Your saved address will fill in automatically. Edit it here if this order should go somewhere else. This change applies to this order only.</p>
+      </fieldset>
       <label>Payment method
         <select id="coPayment"><option value="bank_transfer">Bank transfer</option><option value="paystack">Paystack (connect account first)</option></select>
       </label>
@@ -301,6 +297,6 @@
 <footer>© Big Alien Venture 👽 · Customer service 07025136166</footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="app.js?v=6"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>
