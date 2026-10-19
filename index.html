@@ -180,9 +180,9 @@
       <section id="emailOtpSection" hidden>
         <p>Enter the 6-digit codes sent to your current email and your new email.</p>
         <p>Current email: <b id="currentEmailForOtp"></b></p>
-        <label>Code sent to current email<input id="emailChangeOldOtp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="6-digit code" required></label>
+        <label>Code sent to current email<input id="emailChangeOldOtp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="6-digit code"></label>
         <p>New email: <b id="newEmailForOtp"></b></p>
-        <label>Code sent to new email<input id="emailChangeNewOtp" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" placeholder="6-digit code" required></label>
+        <label>Code sent to new email<input id="emailChangeNewOtp" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" placeholder="6-digit code"></label>
         <button class="primary" id="verifyEmailOtpBtn" type="button">Verify Email Codes</button>
         <button class="secondary" id="resendEmailOtpBtn" type="button" disabled>Resend Code</button>
         <p id="emailOtpCountdown" class="small" aria-live="polite"></p>
@@ -301,6 +301,6 @@
 <footer>© Big Alien Venture 👽 · Customer service 07025136166</footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>
