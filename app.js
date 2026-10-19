@@ -1495,7 +1495,6 @@ document.querySelector(".brand").addEventListener("click", (e) => {
 saveCart();
 bindAccountAndBottomNavigation();
 
-init();
 // Refresh the admin notification badge while the admin dashboard is open.
 setInterval(() => {
   const adminView = $("adminView");
