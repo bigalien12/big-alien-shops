@@ -1507,3 +1507,71 @@ const goToCheckoutBtn = $("goToCheckoutBtn");
 if (goToCheckoutBtn) {
   goToCheckoutBtn.onclick = () => show("checkoutView");
 }
+
+const changeEmailForm = $("changeEmailForm");
+
+if (changeEmailForm) {
+  changeEmailForm.onsubmit = async (e) => {
+    e.preventDefault();
+
+    const msg = $("emailChangeMsg");
+    const newEmail = $("newAccountEmail").value.trim();
+
+    if (!newEmail) {
+      msg.textContent = "Please enter your new email address.";
+      return;
+    }
+
+    msg.textContent = "Updating email...";
+
+    try {
+      const { error } = await sb.auth.updateUser({
+        email: newEmail
+      });
+
+      msg.textContent = error
+        ? "Email update failed: " + error.message
+        : "Confirmation email sent. Open it and confirm the change.";
+    } catch (error) {
+      msg.textContent = "Email update failed: " + error.message;
+    }
+  };
+}
+
+const changePasswordForm = $("changePasswordForm");
+
+if (changePasswordForm) {
+  changePasswordForm.onsubmit = async (e) => {
+    e.preventDefault();
+
+    const msg = $("passwordChangeMsg");
+    const password = $("newAccountPassword").value;
+    const confirmPassword = $("confirmAccountPassword").value;
+
+    if (password.length < 6) {
+      msg.textContent = "Password must be at least 6 characters.";
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      msg.textContent = "The passwords do not match.";
+      return;
+    }
+
+    msg.textContent = "Updating password...";
+
+    try {
+      const { error } = await sb.auth.updateUser({
+        password: password
+      });
+
+      msg.textContent = error
+        ? "Password update failed: " + error.message
+        : "Password updated successfully.";
+
+      if (!error) changePasswordForm.reset();
+    } catch (error) {
+      msg.textContent = "Password update failed: " + error.message;
+    }
+  };
+}
