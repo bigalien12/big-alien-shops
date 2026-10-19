@@ -173,6 +173,16 @@
         <label>New email address<input id="newAccountEmail" type="email" autocomplete="email" required placeholder="new@email.com"></label>
         <button class="primary" type="submit">Update Email</button>
         <div id="emailChangeMsg" class="msg" aria-live="polite"></div>
+    <div id="emailOtpSection" hidden>
+  <label>Enter 6-digit verification code
+    <input id="emailChangeOtp" type="text"
+      inputmode="numeric" autocomplete="one-time-code"
+      maxlength="6" pattern="[0-9]{6}" placeholder="______">
+  </label>
+  <button class="primary" id="verifyEmailOtpBtn" type="button">Verify Code</button>
+  <button id="resendEmailOtpBtn" type="button">Resend Code</button>
+  <p id="emailOtpCountdown" class="small muted"></p>
+    </div>
       </form>
       <hr>
       <h4>Change Password</h4>
