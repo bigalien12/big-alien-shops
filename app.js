@@ -1121,7 +1121,7 @@ function bindAccountAndBottomNavigation() {
         return;
       }
       const viewId =
-        action === "personal" ? "personalDetailsView"
+        action === "personal" ? "accountManagementView"
           : action === "address" ? "deliveryAddressView"
           : action === "email" ? "emailSettingsView"
           : action === "password" ? "passwordSettingsView"
@@ -1221,7 +1221,7 @@ document.addEventListener("click", async (e) => {
       show("customerInboxView");
       loadCustomerInbox();
     }
-    if (t.dataset.accountAction === "personal") show("personalDetailsView");
+    if (t.dataset.accountAction === "personal") { show("accountManagementView"); $("accountManagementPanel")?.classList.remove("hidden"); }
     if (t.dataset.accountAction === "address") show("deliveryAddressView");
     if (t.dataset.accountAction === "email") show("emailSettingsView");
     if (t.dataset.accountAction === "password") show("passwordSettingsView");
