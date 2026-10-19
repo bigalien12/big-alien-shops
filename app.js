@@ -1494,8 +1494,8 @@ document.querySelector(".brand").addEventListener("click", (e) => {
 });
 saveCart();
 bindAccountAndBottomNavigation();
-init();
 
+init();
 // Refresh the admin notification badge while the admin dashboard is open.
 setInterval(() => {
   const adminView = $("adminView");
@@ -1689,7 +1689,8 @@ if (resendEmailOtpBtn) {
         return;
       }
 
-      emailOtpInput.value = "";
+      currentEmailOtpInput.value = "";
+newEmailOtpInput.value = "";
       msg.textContent = "A new verification code has been requested.";
       startEmailOtpCountdown();
     } catch (error) {
@@ -1698,7 +1699,7 @@ if (resendEmailOtpBtn) {
     }
   };
 }
-
+init();
 
 const changePasswordForm = $("changePasswordForm");
 
