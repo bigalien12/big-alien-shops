@@ -1511,14 +1511,20 @@ if (goToCheckoutBtn) {
 
 const changeEmailForm = $("changeEmailForm");
 const emailOtpSection = $("emailOtpSection");
-const emailOtpInput = $("emailChangeOtp");
+const currentEmailOtpInput = $("emailChangeOldOtp");
+const newEmailOtpInput = $("emailChangeNewOtp");
+const currentEmailForOtp = $("currentEmailForOtp");
+const newEmailForOtp = $("newEmailForOtp");
 const verifyEmailOtpBtn = $("verifyEmailOtpBtn");
 const resendEmailOtpBtn = $("resendEmailOtpBtn");
 const emailOtpCountdown = $("emailOtpCountdown");
 
 let pendingEmailChange = "";
+let pendingCurrentEmail = "";
 let emailOtpTimer = null;
 let emailOtpSeconds = 0;
+
+
 
 function startEmailOtpCountdown() {
   clearInterval(emailOtpTimer);
@@ -1550,7 +1556,14 @@ if (changeEmailForm) {
 
     const msg = $("emailChangeMsg");
     const newEmail = $("newAccountEmail").value.trim();
+const { data: userData, error: userError } = await sb.auth.getUser();
 
+if (userError || !userData.user) {
+  msg.textContent = "Please sign in again before changing your email.";
+  return;
+}
+
+pendingCurrentEmail = userData.user.email || "";
     if (!newEmail) {
       msg.textContent = "Please enter your new email address.";
       return;
@@ -1611,14 +1624,30 @@ if (verifyEmailOtpBtn) {
         return;
       }
 
-      msg.textContent = "Email address updated successfully.";
-      emailOtpSection.hidden = true;
-      pendingEmailChange = "";
-      emailOtpInput.value = "";
-      clearInterval(emailOtpTimer);
-      resendEmailOtpBtn.disabled = false;
-      emailOtpCountdown.textContent = "";
-      changeEmailForm.reset();
+      const { data: verifiedData, error: userCheckError } =
+  await sb.auth.getUser();
+
+if (userCheckError) {
+  msg.textContent = "Code accepted, but could not confirm the email change. Please check your account.";
+  return;
+}
+
+const actualEmail = verifiedData.user?.email?.toLowerCase();
+
+if (actualEmail !== pendingEmailChange.toLowerCase()) {
+  msg.textContent =
+    "The code was accepted, but your email has not changed yet. Check both your old and new email inboxes for verification.";
+  return;
+}
+
+msg.textContent = "Email address updated successfully.";
+emailOtpSection.hidden = true;
+pendingEmailChange = "";
+emailOtpInput.value = "";
+clearInterval(emailOtpTimer);
+resendEmailOtpBtn.disabled = false;
+emailOtpCountdown.textContent = "";
+changeEmailForm.reset();
     } catch (error) {
       msg.textContent = "Verification failed: " + error.message;
     } finally {
