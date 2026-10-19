@@ -1597,6 +1597,43 @@ function arrangeAccountSettingsScreens() {
 
 arrangeAccountSettingsScreens();
 
+// Keep the existing account forms connected after they are moved into their
+// dedicated settings screens. The delivery address is stored per signed-in user.
+const savedAddressInput = $("savedAddress");
+const savedAddressForm = savedAddressInput?.closest("form");
+function saveCustomerAddress(event) {
+  if (event) event.preventDefault();
+  if (!user || !savedAddressInput) {
+    const status = $("addressMsg") || $("deliveryAddressMsg");
+    if (status) status.textContent = "Please sign in again before saving your address.";
+    else alert("Please sign in again before saving your address.");
+    return;
+  }
+  const address = savedAddressInput.value.trim();
+  if (!address) {
+    const status = $("addressMsg") || $("deliveryAddressMsg");
+    if (status) status.textContent = "Please enter your delivery address.";
+    else alert("Please enter your delivery address.");
+    return;
+  }
+  localStorage.setItem(`big_alien_address_${user.id}`, address);
+  if ($("accountAddressSummary")) $("accountAddressSummary").textContent = address;
+  if ($("coAddress")) $("coAddress").value = address;
+  const status = $("addressMsg") || $("deliveryAddressMsg");
+  if (status) {
+    status.textContent = "Delivery address saved successfully.";
+    status.style.color = "#147a32";
+  } else {
+    alert("Delivery address saved successfully.");
+  }
+}
+if (savedAddressForm) savedAddressForm.addEventListener("submit", saveCustomerAddress);
+// Support the existing save button even if the address input is not inside a form.
+["saveAddressBtn", "saveDeliveryAddressBtn", "updateAddressBtn"].forEach((id) => {
+  const button = $(id);
+  if (button) button.addEventListener("click", saveCustomerAddress);
+});
+
 if ($("darkModeToggle"))
   $("darkModeToggle").addEventListener("change", (e) =>
     applyTheme(e.target.checked)
@@ -1902,6 +1939,11 @@ if (changePasswordForm) {
 
     if (password !== confirmPassword) {
       msg.textContent = "The passwords do not match.";
+      return;
+    }
+
+    if (!sb || !user) {
+      msg.textContent = "Please sign in again before changing your password.";
       return;
     }
 
