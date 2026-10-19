@@ -454,12 +454,26 @@ async function loadProfile() {
   if ($("accountNameSummary")) $("accountNameSummary").textContent = profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || "Add your name";
   if ($("accountPhoneSummary")) $("accountPhoneSummary").textContent = profile?.phone || user?.user_metadata?.phone || "Add your phone number";
   if ($("accountEmailSummary")) $("accountEmailSummary").textContent = user?.email || "Email unavailable";
-  const photoKey = `big_alien_profile_photo_${user.id}`;
-  const photoData = localStorage.getItem(photoKey) || "";
+  // Profile photos live in the private Supabase Storage bucket, not localStorage.
+  // Only a signed-in user who passes the bucket's SELECT policy can obtain a URL.
+  const photoPath = user.user_metadata?.avatar_path || "";
+  let photoUrl = "";
+  if (photoPath && sb) {
+    const { data: signedPhoto, error: signedPhotoError } = await sb.storage
+      .from("profile-photos")
+      .createSignedUrl(photoPath, 3600);
+    if (signedPhotoError) {
+      console.warn("Could not load private profile photo:", signedPhotoError.message);
+    } else {
+      photoUrl = signedPhoto?.signedUrl || "";
+    }
+  }
   const paintPhoto = (id) => {
     const el = $(id);
     if (!el) return;
-    el.innerHTML = photoData ? `<img src="${photoData}" alt="Customer profile photo">` : "👤";
+    el.innerHTML = photoUrl
+      ? `<img src="${esc(photoUrl)}" alt="Your private profile photo">`
+      : "👤";
   };
   paintPhoto("profilePhotoPreview");
   paintPhoto("accountAvatarPreview");
@@ -1445,30 +1459,81 @@ $("profileForm").onsubmit = async (e) => {
 };
 
 const profilePhotoInput = $("profilePhotoInput");
-if (profilePhotoInput) profilePhotoInput.addEventListener("change", () => {
+if (profilePhotoInput) profilePhotoInput.addEventListener("change", async () => {
   const file = profilePhotoInput.files && profilePhotoInput.files[0];
   if (!file) return;
-  if (!file.type.startsWith("image/")) { alert("Please choose an image file."); profilePhotoInput.value = ""; return; }
-  if (file.size > 2 * 1024 * 1024) { alert("Please choose a photo smaller than 2 MB."); profilePhotoInput.value = ""; return; }
-  const reader = new FileReader();
-  reader.onload = () => {
-    if (!user || typeof reader.result !== "string") return;
-    try {
-      localStorage.setItem(`big_alien_profile_photo_${user.id}`, reader.result);
-      const paint = (id) => { const el = $(id); if (el) el.innerHTML = `<img src="${reader.result}" alt="Customer profile photo">`; };
-      paint("profilePhotoPreview"); paint("accountAvatarPreview");
-      msg("profileMsg", "Profile photo updated on this device.", true);
-    } catch (err) {
-      alert("This photo is too large to save on this device. Please choose a smaller photo.");
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+  if (!allowedTypes.includes(file.type)) {
+    alert("Please choose a JPEG, PNG, or WebP image.");
+    profilePhotoInput.value = "";
+    return;
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    alert("Please choose a photo smaller than 2 MB.");
+    profilePhotoInput.value = "";
+    return;
+  }
+  if (!user || !sb) {
+    msg("profileMsg", "Please sign in again before uploading a photo.");
+    profilePhotoInput.value = "";
+    return;
+  }
+  const extension = ({ "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" })[file.type];
+  const path = `${user.id}/avatar.${extension}`;
+  msg("profileMsg", "Uploading your private profile photo…", true);
+  profilePhotoInput.disabled = true;
+  try {
+    const { error: uploadError } = await sb.storage
+      .from("profile-photos")
+      .upload(path, file, { upsert: true, contentType: file.type });
+    if (uploadError) {
+      msg("profileMsg", "Photo upload failed: " + uploadError.message);
+      return;
     }
-  };
-  reader.readAsDataURL(file);
+    const { data: updatedData, error: metadataError } = await sb.auth.updateUser({
+      data: { avatar_path: path }
+    });
+    if (metadataError) {
+      msg("profileMsg", "Photo uploaded, but saving it to your account failed: " + metadataError.message);
+      return;
+    }
+    if (updatedData?.user) user = updatedData.user;
+    await loadProfile();
+    msg("profileMsg", "Profile photo saved securely to your account.", true);
+  } catch (error) {
+    msg("profileMsg", "Photo upload failed: " + (error?.message || String(error)));
+  } finally {
+    profilePhotoInput.disabled = false;
+    profilePhotoInput.value = "";
+  }
 });
-if ($("removeProfilePhotoBtn")) $("removeProfilePhotoBtn").addEventListener("click", () => {
-  if (!user) return;
-  localStorage.removeItem(`big_alien_profile_photo_${user.id}`);
-  ["profilePhotoPreview", "accountAvatarPreview"].forEach(id => { const el = $(id); if (el) el.textContent = "👤"; });
-  if ($("profileMsg")) msg("profileMsg", "Profile photo removed.", true);
+if ($("removeProfilePhotoBtn")) $("removeProfilePhotoBtn").addEventListener("click", async () => {
+  if (!user || !sb) return;
+  if (!user.user_metadata?.avatar_path) {
+    msg("profileMsg", "You have no profile photo to remove.");
+    return;
+  }
+  if (!confirm("Remove your profile photo?")) return;
+  const oldPath = user.user_metadata.avatar_path;
+  try {
+    const { error: removeError } = await sb.storage.from("profile-photos").remove([oldPath]);
+    if (removeError) {
+      msg("profileMsg", "Could not remove the stored photo. Check the bucket DELETE policy: " + removeError.message);
+      return;
+    }
+    const { data: updatedData, error: metadataError } = await sb.auth.updateUser({
+      data: { avatar_path: null }
+    });
+    if (metadataError) {
+      msg("profileMsg", "Photo file removed, but account update failed: " + metadataError.message);
+      return;
+    }
+    if (updatedData?.user) user = updatedData.user;
+    await loadProfile();
+    msg("profileMsg", "Profile photo removed.", true);
+  } catch (error) {
+    msg("profileMsg", "Could not remove photo: " + (error?.message || String(error)));
+  }
 });
 
 if ($("adminNotificationsBtn"))
