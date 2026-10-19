@@ -1508,7 +1508,41 @@ if (goToCheckoutBtn) {
   goToCheckoutBtn.onclick = () => show("checkoutView");
 }
 
+
 const changeEmailForm = $("changeEmailForm");
+const emailOtpSection = $("emailOtpSection");
+const emailOtpInput = $("emailChangeOtp");
+const verifyEmailOtpBtn = $("verifyEmailOtpBtn");
+const resendEmailOtpBtn = $("resendEmailOtpBtn");
+const emailOtpCountdown = $("emailOtpCountdown");
+
+let pendingEmailChange = "";
+let emailOtpTimer = null;
+let emailOtpSeconds = 0;
+
+function startEmailOtpCountdown() {
+  clearInterval(emailOtpTimer);
+  emailOtpSeconds = 60;
+  resendEmailOtpBtn.disabled = true;
+
+  const updateCountdown = () => {
+    emailOtpCountdown.textContent =
+      emailOtpSeconds > 0
+        ? `Resend code in ${emailOtpSeconds}s`
+        : "You can resend the code now.";
+
+    if (emailOtpSeconds <= 0) {
+      clearInterval(emailOtpTimer);
+      resendEmailOtpBtn.disabled = false;
+      return;
+    }
+
+    emailOtpSeconds--;
+  };
+
+  updateCountdown();
+  emailOtpTimer = setInterval(updateCountdown, 1000);
+}
 
 if (changeEmailForm) {
   changeEmailForm.onsubmit = async (e) => {
@@ -1522,21 +1556,111 @@ if (changeEmailForm) {
       return;
     }
 
-    msg.textContent = "Updating email...";
+    msg.textContent = "Sending verification code...";
 
     try {
       const { error } = await sb.auth.updateUser({
         email: newEmail
       });
 
-      msg.textContent = error
-        ? "Email update failed: " + error.message
-        : "Confirmation email sent. Open it and confirm the change.";
+      if (error) {
+        msg.textContent = "Email update failed: " + error.message;
+        return;
+      }
+
+      pendingEmailChange = newEmail;
+      emailOtpSection.hidden = false;
+      emailOtpInput.value = "";
+      msg.textContent =
+        "Check " + newEmail + " for your 6-digit verification code.";
+
+      startEmailOtpCountdown();
     } catch (error) {
       msg.textContent = "Email update failed: " + error.message;
     }
   };
 }
+
+if (verifyEmailOtpBtn) {
+  verifyEmailOtpBtn.onclick = async () => {
+    const msg = $("emailChangeMsg");
+    const token = emailOtpInput.value.trim();
+
+    if (!pendingEmailChange) {
+      msg.textContent = "Enter your new email and request a code first.";
+      return;
+    }
+
+    if (!/^\d{6}$/.test(token)) {
+      msg.textContent = "Enter the 6-digit verification code.";
+      return;
+    }
+
+    verifyEmailOtpBtn.disabled = true;
+    msg.textContent = "Verifying code...";
+
+    try {
+      const { error } = await sb.auth.verifyOtp({
+        email: pendingEmailChange,
+        token,
+        type: "email_change"
+      });
+
+      if (error) {
+        msg.textContent = "Verification failed: " + error.message;
+        return;
+      }
+
+      msg.textContent = "Email address updated successfully.";
+      emailOtpSection.hidden = true;
+      pendingEmailChange = "";
+      emailOtpInput.value = "";
+      clearInterval(emailOtpTimer);
+      resendEmailOtpBtn.disabled = false;
+      emailOtpCountdown.textContent = "";
+      changeEmailForm.reset();
+    } catch (error) {
+      msg.textContent = "Verification failed: " + error.message;
+    } finally {
+      verifyEmailOtpBtn.disabled = false;
+    }
+  };
+}
+
+if (resendEmailOtpBtn) {
+  resendEmailOtpBtn.onclick = async () => {
+    const msg = $("emailChangeMsg");
+
+    if (!pendingEmailChange) {
+      msg.textContent = "Request an email change first.";
+      return;
+    }
+
+    resendEmailOtpBtn.disabled = true;
+    msg.textContent = "Resending verification code...";
+
+    try {
+      const { error } = await sb.auth.resend({
+        type: "email_change",
+        email: pendingEmailChange
+      });
+
+      if (error) {
+        msg.textContent = "Could not resend code: " + error.message;
+        resendEmailOtpBtn.disabled = false;
+        return;
+      }
+
+      emailOtpInput.value = "";
+      msg.textContent = "A new verification code has been requested.";
+      startEmailOtpCountdown();
+    } catch (error) {
+      msg.textContent = "Could not resend code: " + error.message;
+      resendEmailOtpBtn.disabled = false;
+    }
+  };
+}
+
 
 const changePasswordForm = $("changePasswordForm");
 
