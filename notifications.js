@@ -13,11 +13,7 @@ const VAPID_KEY =
 
 async function setupBigAlienNotifications() {
   const button = document.getElementById("enablePushNotifications");
-
-  if (!button) {
-    console.error("Notification button was not found.");
-    return;
-  }
+  if (!button) return;
 
   button.addEventListener("click", async () => {
     const originalText = button.textContent;
@@ -28,26 +24,40 @@ async function setupBigAlienNotifications() {
 
       if (!("serviceWorker" in navigator) ||
           !("Notification" in window)) {
-        throw new Error(
-          "This browser does not support web push notifications."
-        );
+        throw new Error("Web push is not supported in this browser.");
       }
 
       const permission = await Notification.requestPermission();
-
       if (permission !== "granted") {
-        throw new Error(
-          "Notifications were not allowed. Enable them in your browser settings."
-        );
+        throw new Error("Please allow notifications in your device settings.");
       }
 
-      const appModule = await import(
-        "https://www.gstatic.com/firebasejs/13.0.0/firebase-app.js"
+      const [appModule, messagingModule, supabaseModule] =
+        await Promise.all([
+          import("https://www.gstatic.com/firebasejs/13.0.0/firebase-app.js"),
+          import("https://www.gstatic.com/firebasejs/13.0.0/firebase-messaging.js"),
+          import("https://esm.sh/@supabase/supabase-js@2")
+        ]);
+
+      const cfg = window.BIG_ALIEN_CONFIG;
+      if (!cfg?.SUPABASE_URL || !cfg?.SUPABASE_PUBLISHABLE_KEY) {
+        throw new Error("Supabase configuration was not found.");
+      }
+
+      const sb = supabaseModule.createClient(
+        cfg.SUPABASE_URL,
+        cfg.SUPABASE_PUBLISHABLE_KEY
       );
 
-      const messagingModule = await import(
-        "https://www.gstatic.com/firebasejs/13.0.0/firebase-messaging.js"
-      );
+      const { data: sessionData, error: sessionError } =
+        await sb.auth.getSession();
+
+      if (sessionError) throw sessionError;
+
+      const session = sessionData.session;
+      if (!session?.user) {
+        throw new Error("Please sign in to your Big Alien account first.");
+      }
 
       const existingApp = appModule.getApps().find(
         app => app.name === "BigAlienNotifications"
@@ -63,8 +73,6 @@ async function setupBigAlienNotifications() {
         { scope: "/big-alien-shops/" }
       );
 
-      await navigator.serviceWorker.ready;
-
       const messaging = messagingModule.getMessaging(app);
 
       const token = await messagingModule.getToken(messaging, {
@@ -73,32 +81,32 @@ async function setupBigAlienNotifications() {
       });
 
       if (!token) {
-        throw new Error(
-          "Firebase did not return a notification token."
-        );
+        throw new Error("Firebase did not return a device token.");
       }
+
+      const { error: saveError } = await sb
+        .from("push_tokens")
+        .upsert(
+          {
+            user_id: session.user.id,
+            token,
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: "token" }
+        );
+
+      if (saveError) throw saveError;
 
       localStorage.setItem("bigAlienFCMToken", token);
 
       button.textContent = "Notifications Enabled ✓";
-
-      alert(
-        "Notifications are enabled on this device! " +
-        "You can now receive supported Big Alien notifications."
-      );
-
-      console.log("Big Alien notification registration succeeded.");
+      alert("Notifications are enabled and your device token was saved.");
 
     } catch (error) {
       console.error("Big Alien notification error:", error);
-
-      alert(
-        "Could not enable notifications.\n\n" +
-        (error.message || "Please try again.")
-      );
-
+      alert("Could not enable notifications.\n\n" +
+        (error.message || "Please try again."));
       button.textContent = originalText;
-
     } finally {
       button.disabled = false;
     }
@@ -106,11 +114,8 @@ async function setupBigAlienNotifications() {
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener(
-    "DOMContentLoaded",
-    setupBigAlienNotifications,
-    { once: true }
-  );
+  document.addEventListener("DOMContentLoaded",
+    setupBigAlienNotifications, { once: true });
 } else {
   setupBigAlienNotifications();
 }
