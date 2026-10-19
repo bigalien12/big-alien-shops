@@ -167,9 +167,33 @@
 
 
   <section id="personalDetailsView" class="accountSubscreen hidden"><button class="secondary accountBackBtn" type="button" data-account-back>← Back to My Account</button><section class="checkout accountPanel"><h2>Personal Details</h2><div id="personalFormSlot"></div></section></section>
-  <section id="deliveryAddressView" class="accountSubscreen hidden"><button class="secondary accountBackBtn" type="button" data-account-back>← Back to My Account</button><section class="checkout accountPanel"><h2>Delivery Address</h2><p class="muted">Enter your address in Nigeria.</p><div id="addressFormSlot"></div></section></section>
-  <section id="emailSettingsView" class="accountSubscreen hidden"><button class="secondary accountBackBtn" type="button" data-account-back>← Back to My Account</button><section class="checkout accountPanel"><h2>Email Address</h2><p class="muted">Verification progress will remain on this screen.</p><div id="emailFormSlot"></div></section></section>
-  <section id="passwordSettingsView" class="accountSubscreen hidden"><button class="secondary accountBackBtn" type="button" data-account-back>← Back to My Account</button><section class="checkout accountPanel"><h2>Change Password</h2><div id="passwordFormSlot"></div></section></section>
+  <section id="deliveryAddressView" class="accountSubscreen hidden"><button class="secondary accountBackBtn" type="button" data-account-back>← Back to My Account</button><section class="checkout accountPanel"><h2>Delivery Address</h2><p class="muted">Enter your address in Nigeria.</p><form id="savedAddressForm" class="accountSettingsForm">
+      <label>Full delivery address in Nigeria<textarea id="savedAddress" rows="4" autocomplete="street-address" placeholder="House/flat number, street name, area, LGA, city, state, Nigeria" required></textarea></label>
+      <p class="small muted">Include your house number, street, area, LGA, city and state so your order can reach you.</p>
+      <button class="primary" id="saveAddressBtn" type="submit">Save Delivery Address</button>
+      <div id="addressMsg" class="msg" aria-live="polite"></div>
+    </form></section></section>
+  <section id="emailSettingsView" class="accountSubscreen hidden"><button class="secondary accountBackBtn" type="button" data-account-back>← Back to My Account</button><section class="checkout accountPanel"><h2>Email Address</h2><p class="muted">Verification progress will remain on this screen.</p><form id="changeEmailForm" class="accountSettingsForm">
+      <label>New email address<input id="newAccountEmail" type="email" autocomplete="email" placeholder="Enter your new email" required></label>
+      <button class="primary" type="submit">Request Email Change</button>
+      <div id="emailChangeMsg" class="msg" aria-live="polite"></div>
+      <section id="emailOtpSection" hidden>
+        <p>Enter the 6-digit codes sent to your current email and your new email.</p>
+        <p>Current email: <b id="currentEmailForOtp"></b></p>
+        <label>Code sent to current email<input id="emailChangeOldOtp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" placeholder="6-digit code" required></label>
+        <p>New email: <b id="newEmailForOtp"></b></p>
+        <label>Code sent to new email<input id="emailChangeNewOtp" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" placeholder="6-digit code" required></label>
+        <button class="primary" id="verifyEmailOtpBtn" type="button">Verify Email Codes</button>
+        <button class="secondary" id="resendEmailOtpBtn" type="button" disabled>Resend Code</button>
+        <p id="emailOtpCountdown" class="small" aria-live="polite"></p>
+      </section>
+    </form></section></section>
+  <section id="passwordSettingsView" class="accountSubscreen hidden"><button class="secondary accountBackBtn" type="button" data-account-back>← Back to My Account</button><section class="checkout accountPanel"><h2>Change Password</h2><form id="changePasswordForm" class="accountSettingsForm">
+      <label>New password<input id="newAccountPassword" type="password" autocomplete="new-password" minlength="6" required placeholder="At least 6 characters"></label>
+      <label>Confirm new password<input id="confirmAccountPassword" type="password" autocomplete="new-password" minlength="6" required placeholder="Enter the password again"></label>
+      <button class="primary" type="submit">Update Password</button>
+      <div id="passwordChangeMsg" class="msg" aria-live="polite"></div>
+    </form></section></section>
   <section id="customerInboxView" class="accountSubscreen hidden">
     <button class="secondary accountBackBtn" type="button" data-account-back>← Back to My Account</button>
     <section class="notificationPanel customerInboxPanel" aria-labelledby="customerInboxTitle">
@@ -277,6 +301,6 @@
 <footer>© Big Alien Venture 👽 · Customer service 07025136166</footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>
