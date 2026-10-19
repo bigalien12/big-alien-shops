@@ -454,26 +454,55 @@ async function loadProfile() {
   if ($("accountNameSummary")) $("accountNameSummary").textContent = profile?.full_name || user?.user_metadata?.full_name || user?.user_metadata?.name || "Add your name";
   if ($("accountPhoneSummary")) $("accountPhoneSummary").textContent = profile?.phone || user?.user_metadata?.phone || "Add your phone number";
   if ($("accountEmailSummary")) $("accountEmailSummary").textContent = user?.email || "Email unavailable";
-  // Profile photos live in the private Supabase Storage bucket, not localStorage.
-  // Only a signed-in user who passes the bucket's SELECT policy can obtain a URL.
+  // Keep the current photo visible while refreshing a private signed URL.
+  // Reuse a valid URL during normal navigation to avoid avatar flicker.
+  const photoUserId = user.id;
   const photoPath = user.user_metadata?.avatar_path || "";
+  window.bigAlienProfilePhotoCache = window.bigAlienProfilePhotoCache || null;
   let photoUrl = "";
-  if (photoPath && sb) {
+  const cachedPhoto = window.bigAlienProfilePhotoCache;
+  if (photoPath && cachedPhoto && cachedPhoto.userId === photoUserId &&
+      cachedPhoto.path === photoPath && cachedPhoto.expiresAt > Date.now() + 60000) {
+    photoUrl = cachedPhoto.url;
+  } else if (photoPath && sb) {
     const { data: signedPhoto, error: signedPhotoError } = await sb.storage
       .from("profile-photos")
       .createSignedUrl(photoPath, 3600);
-    if (signedPhotoError) {
-      console.warn("Could not load private profile photo:", signedPhotoError.message);
-    } else {
-      photoUrl = signedPhoto?.signedUrl || "";
+    // Do not let a slower request for an old account overwrite the current avatar.
+    if (user?.id === photoUserId && user?.user_metadata?.avatar_path === photoPath) {
+      if (signedPhotoError) {
+        console.warn("Could not load private profile photo:", signedPhotoError.message);
+      } else {
+        photoUrl = signedPhoto?.signedUrl || "";
+        if (photoUrl) window.bigAlienProfilePhotoCache = {
+          userId: photoUserId, path: photoPath, url: photoUrl,
+          expiresAt: Date.now() + 50 * 60 * 1000
+        };
+      }
     }
   }
   const paintPhoto = (id) => {
     const el = $(id);
     if (!el) return;
-    el.innerHTML = photoUrl
-      ? `<img src="${esc(photoUrl)}" alt="Your private profile photo">`
-      : "👤";
+    if (!photoPath) {
+      el.textContent = "👤";
+      return;
+    }
+    // If a photo is already displayed, never replace it with a blank/default
+    // while a refreshed signed URL is being fetched or an image is loading.
+    if (!photoUrl) return;
+    const currentImg = el.querySelector("img");
+    if (currentImg && currentImg.dataset.photoPath === photoPath && currentImg.src === photoUrl) return;
+    const nextImg = document.createElement("img");
+    nextImg.alt = "Your private profile photo";
+    nextImg.dataset.photoPath = photoPath;
+    nextImg.onload = () => {
+      if (user?.id === photoUserId && user?.user_metadata?.avatar_path === photoPath) {
+        el.replaceChildren(nextImg);
+      }
+    };
+    nextImg.onerror = () => { /* Keep the previous visible photo on a transient error. */ };
+    nextImg.src = photoUrl;
   };
   paintPhoto("profilePhotoPreview");
   paintPhoto("accountAvatarPreview");
@@ -1135,7 +1164,8 @@ function bindAccountAndBottomNavigation() {
         return;
       }
       const viewId =
-        action === "personal" ? "personalDetailsView"
+        // Personal Details uses the same working name/phone/photo form as Account Management.
+        action === "personal" ? "accountManagementView"
           : action === "address" ? "deliveryAddressView"
           : action === "email" ? "emailSettingsView"
           : action === "password" ? "passwordSettingsView"
@@ -1149,7 +1179,7 @@ function bindAccountAndBottomNavigation() {
         show(viewId);
         window.scrollTo({ top: 0, behavior: "auto" });
       }
-      if (action === "management") loadProfile();
+      if (action === "management" || action === "personal") loadProfile();
     });
   });
 }
@@ -1498,6 +1528,7 @@ if (profilePhotoInput) profilePhotoInput.addEventListener("change", async () => 
       return;
     }
     if (updatedData?.user) user = updatedData.user;
+    window.bigAlienProfilePhotoCache = null;
     await loadProfile();
     msg("profileMsg", "Profile photo saved securely to your account.", true);
   } catch (error) {
@@ -1529,6 +1560,7 @@ if ($("removeProfilePhotoBtn")) $("removeProfilePhotoBtn").addEventListener("cli
       return;
     }
     if (updatedData?.user) user = updatedData.user;
+    window.bigAlienProfilePhotoCache = null;
     await loadProfile();
     msg("profileMsg", "Profile photo removed.", true);
   } catch (error) {
