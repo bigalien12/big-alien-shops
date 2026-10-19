@@ -1069,6 +1069,9 @@ async function init() {
     }
     if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
       await loadProfile();
+      // Email-change verification can emit an auth event. Keep the customer
+      // on Email Address so they can read the success message and leave manually.
+      if (currentView === "emailSettingsView") return;
       show("homeView");
       await loadProducts();
     }
