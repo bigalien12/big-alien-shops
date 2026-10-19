@@ -1069,9 +1069,12 @@ async function init() {
     }
     if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
       await loadProfile();
-      // Email-change verification can emit an auth event. Keep the customer
-      // on Email Address so they can read the success message and leave manually.
-      if (currentView === "emailSettingsView") return;
+      // Email-change OTP verification can emit SIGNED_IN. Keep the customer
+      // on the Email Address screen; only their own Home action should leave it.
+      const emailSettingsScreen = $("emailSettingsView");
+      if (event === "SIGNED_IN" && emailSettingsScreen && !emailSettingsScreen.classList.contains("hidden")) {
+        return;
+      }
       show("homeView");
       await loadProducts();
     }
@@ -1124,7 +1127,7 @@ function bindAccountAndBottomNavigation() {
         return;
       }
       const viewId =
-        action === "personal" ? "accountManagementView"
+        action === "personal" ? "personalDetailsView"
           : action === "address" ? "deliveryAddressView"
           : action === "email" ? "emailSettingsView"
           : action === "password" ? "passwordSettingsView"
@@ -1224,7 +1227,7 @@ document.addEventListener("click", async (e) => {
       show("customerInboxView");
       loadCustomerInbox();
     }
-    if (t.dataset.accountAction === "personal") { show("accountManagementView"); $("accountManagementPanel")?.classList.remove("hidden"); }
+    if (t.dataset.accountAction === "personal") show("personalDetailsView");
     if (t.dataset.accountAction === "address") show("deliveryAddressView");
     if (t.dataset.accountAction === "email") show("emailSettingsView");
     if (t.dataset.accountAction === "password") show("passwordSettingsView");
