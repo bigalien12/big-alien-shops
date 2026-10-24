@@ -15,6 +15,7 @@
   <div class="adminNav">
     <a class="brand" href="./"><img src="images/logo.png" alt="Big Alien Venture logo"><span>BIG ALIEN ADMIN</span></a>
     <button class="secondary" id="adminMessagesBtn" type="button">🔔 Messages <span id="adminUnreadCount" class="notificationBadge">0</span></button>
+<button class="secondary" id="enablePushNotifications" type="button">🔔 Enable Push Notifications</button>
     <button class="secondary" id="backHome">← Store</button>
     <button class="secondary" id="adminLogout">Logout</button>
   </div>
@@ -36,5 +37,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="admin.js"></script>
+  <script type="module" src="notifications.js"></script>
 </body>
 </html>
