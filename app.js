@@ -322,27 +322,51 @@ function setupCheckoutPaymentGate() {
   const panel = document.createElement("div");
   panel.id = "bavPaymentGate";
   panel.className = "bankBox";
-  panel.innerHTML = `<b>Bank transfer</b><p>Account name: Abel Philip<br>Account number: <span id="bavAccountNo">6714306196</span> <button class="secondary" type="button" id="bavCopyAccount">Copy</button><br>Bank: Moniepoint MFB</p><p>Transfer the checkout total, then tap <b>I Have Paid</b>. This reports your payment; the store must still confirm receipt.</p><button class="primary" type="button" id="bavReportPayment">I Have Paid</button><p id="bavPaymentMsg" class="msg" aria-live="polite">Choose bank transfer or Paystack to continue.</p>`;
-  const submit = form.querySelector('button[type="submit"],input[type="submit"]');
-  if (submit) { submit.id = "bavPlaceOrder"; submit.disabled = false; submit.hidden = false; }
+  panel.innerHTML = `<b>Bank transfer</b><p>Account name: Abel Philip<br>Account number: <span id="bavAccountNo">6714306196</span> <button class="secondary" type="button" id="bavCopyAccount">Copy</button><br>Bank: Moniepoint MFB</p><p>Transfer the checkout total, then tap <b>I Have Paid</b>. This reports your payment; the store must still confirm receipt.</p><button class="primary" type="button" id="bavReportPayment">I Have Paid</button><p id="bavPaymentMsg" class="msg" aria-live="polite">Place Order unlocks after you submit your payment report.</p>`;
+  const submit = form.querySelector(
+    'button[type="submit"],input[type="submit"]'
+  );
+  if (submit) {
+    submit.id = "bavPlaceOrder";
+    submit.disabled = true;
+    submit.hidden = true;
+  }
   const oldBank = form.querySelector(".bankBox");
   if (oldBank) oldBank.remove();
   const paymentLabel = $("coPayment")?.closest("label");
-  if (paymentLabel) paymentLabel.insertAdjacentElement("afterend", panel); else form.prepend(panel);
+  if (paymentLabel) paymentLabel.insertAdjacentElement("afterend", panel);
+  else form.prepend(panel);
   $("bavCopyAccount").addEventListener("click", async () => {
-    try { await navigator.clipboard.writeText("6714306196"); $("bavPaymentMsg").textContent = "Account number copied."; }
-    catch { $("bavPaymentMsg").textContent = "Copy not available. Please copy 6714306196 manually."; }
+    try {
+      await navigator.clipboard.writeText("6714306196");
+      $("bavPaymentMsg").textContent = "Account number copied.";
+    } catch {
+      $("bavPaymentMsg").textContent =
+        "Copy not available. Please copy 6714306196 manually.";
+    }
   });
   $("bavReportPayment").addEventListener("click", reportCheckoutPayment);
   $("coPayment")?.addEventListener("change", () => {
     const bank = $("coPayment").value === "bank_transfer";
-    panel.classList.toggle("hidden", !bank);
-    if (submit) { submit.hidden = false; submit.disabled = false; }
-    if (!bank) $("bavPaymentMsg").textContent = "Tap Place Order to continue to secure Paystack checkout.";
+    const paystack = $("coPayment").value === "paystack";
+    $("bavPaymentGate").classList.toggle("hidden", !bank);
+    if (submit) {
+      submit.hidden = bank ? !sessionStorage.getItem(checkoutReportKey()) : !paystack;
+      submit.disabled = bank ? !sessionStorage.getItem(checkoutReportKey()) : !paystack;
+    }
+    if (!bank) {
+      $("bavPaymentMsg").textContent = paystack
+        ? "You will be redirected to Paystack to complete your payment securely."
+        : "Choose a supported payment method.";
+    }
   });
-  panel.classList.toggle("hidden", $("coPayment")?.value !== "bank_transfer");
   const key = checkoutReportKey();
-  if (key && sessionStorage.getItem(key)) $("bavPaymentMsg").textContent = "Payment report saved. You can place the order now.";
+  if (key && sessionStorage.getItem(key) && submit) {
+    submit.hidden = false;
+    submit.disabled = false;
+    $("bavPaymentMsg").textContent =
+      "Payment report saved for this checkout. You can place the order now.";
+  }
 }
 async function reportCheckoutPayment() {
   const status = $("bavPaymentMsg");
@@ -357,7 +381,7 @@ async function reportCheckoutPayment() {
     return;
   }
   if ($("coPayment").value !== "bank_transfer") {
-    status.textContent = "Choose Bank Transfer to submit a transfer report.";
+    status.textContent = "Bank transfer is the only configured method.";
     return;
   }
   if (key && sessionStorage.getItem(key)) {
@@ -486,104 +510,193 @@ async function loadProfile() {
   const adminBtn = $("adminBtn");
   if (adminBtn) adminBtn.classList.toggle("hidden", data?.role !== "admin");
 }
-async function submitOrder(e) {
-  e.preventDefault();
-  if (!user) return msg("checkoutMsg", "Please sign in first.");
-  if (!cart.length) return msg("checkoutMsg", "Cart is empty.");
-  const method = $("coPayment")?.value || "bank_transfer";
-  const reportKey = checkoutReportKey();
-  const reportId = reportKey ? sessionStorage.getItem(reportKey) : null;
-  if (method === "bank_transfer" && !reportId)
-    return msg("checkoutMsg", "Transfer payment first, then tap “I Have Paid” before placing your order.");
-
-  const subtotal = cart.reduce((a, x) => a + x.price * x.qty, 0);
+async function submitPaystackOrder() {
+  const button = $("checkoutForm")?.querySelector('button[type="submit"],input[type="submit"]');
+  const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
   const shippingFee = 3000;
   const total = subtotal + shippingFee;
-  const isPaystack = method === "paystack" || method === "card";
+  if (!$("coName")?.value.trim() || !$("coPhone")?.value.trim() || !$("coAddress")?.value.trim())
+    return msg("checkoutMsg", "Please complete your name, phone number, and delivery address.");
+  if (button) button.disabled = true;
+  msg("checkoutMsg", "Preparing your secure Paystack checkout…");
   const payload = {
-    user_id: user.id, subtotal, shipping_fee: shippingFee, total,
-    payment_method: isPaystack ? "paystack" : "bank_transfer",
-    payment_status: "pending", order_status: "processing",
+    user_id: user.id,
+    subtotal,
+    shipping_fee: shippingFee,
+    total,
+    payment_method: "paystack",
+    payment_status: "pending",
+    order_status: "processing",
     customer_name: $("coName").value.trim(),
     customer_phone: $("coPhone").value.trim(),
     delivery_address: $("coAddress").value.trim(),
-    notes: isPaystack
-      ? `Contact email for this order: ${$("coEmail")?.value.trim() || user.email || ""}. Paystack payment initiated; awaiting verification.`
-      : `Contact email for this order: ${$("coEmail")?.value.trim() || user.email || ""}. Customer reported payment; awaiting admin verification.`,
+    notes: `Contact email for this order: ${$("coEmail").value.trim()}. Awaiting Paystack payment confirmation.`,
   };
-  msg("checkoutMsg", isPaystack ? "Preparing secure Paystack checkout…" : "Placing your order…");
-  const submit = $("bavPlaceOrder") || document.querySelector('#checkoutForm button[type="submit"]');
-  if (submit) submit.disabled = true;
-  const { data: o, error } = await sb.from("orders").insert(payload).select().single();
-  if (error) { if (submit) submit.disabled = false; return msg("checkoutMsg", error.message); }
-  const items = cart.map((x) => ({ order_id: o.id, product_id: x.id, product_name: x.name, product_price: x.price, quantity: x.qty, image_url: x.image_url, size: x.size || null, color: x.color || null }));
-  const { error: ie } = await sb.from("order_items").insert(items);
-  if (ie) {
-    await sb.from("orders").delete().eq("id", o.id);
-    if (submit) submit.disabled = false;
-    return msg("checkoutMsg", ie.message);
-  }
-
-  if (isPaystack) {
-    try {
-      const callbackUrl = `${window.location.origin}${window.location.pathname}?paystack=callback&order_id=${encodeURIComponent(o.id)}`;
-      const { data: initData, error: initError } = await sb.functions.invoke("paystack-initialize", { body: { order_id: o.id, callback_url: callbackUrl } });
-      if (initError) throw new Error(initError.message || "Could not start Paystack payment.");
-      const payUrl = initData?.authorization_url || initData?.data?.authorization_url;
-      if (!payUrl) throw new Error(initData?.error || "Paystack did not return a checkout link. Check the paystack-initialize function.");
-      sessionStorage.setItem("bav_paystack_pending_order", o.id);
-      window.location.href = payUrl;
-      return;
-    } catch (err) {
-      if (submit) submit.disabled = false;
-      return msg("checkoutMsg", "Paystack could not start: " + (err?.message || err) + ". Your order is still pending; do not pay twice. Contact store support if needed.");
+  let order;
+  try {
+    const { data, error } = await sb.from("orders").insert(payload).select().single();
+    if (error) throw error;
+    order = data;
+    const items = cart.map((item) => ({
+      order_id: order.id, product_id: item.id, product_name: item.name,
+      product_price: item.price, quantity: item.qty, image_url: item.image_url,
+      size: item.size || null, color: item.color || null,
+    }));
+    const { error: itemsError } = await sb.from("order_items").insert(items);
+    if (itemsError) {
+      await sb.from("orders").delete().eq("id", order.id);
+      throw itemsError;
     }
+    const callbackUrl = `${window.location.origin}${window.location.pathname}?paystack=return&order_id=${encodeURIComponent(order.id)}`;
+    const { data: payment, error: initError } = await sb.functions.invoke("paystack-initialize", {
+      body: { order_id: order.id, callback_url: callbackUrl },
+    });
+    if (initError) throw initError;
+    const url = payment?.authorization_url || payment?.data?.authorization_url;
+    if (!url) throw new Error(payment?.error || "Paystack did not return a checkout link. Check the paystack-initialize function response.");
+    window.location.href = url;
+  } catch (error) {
+    console.error("Paystack checkout failed:", error);
+    msg("checkoutMsg", `Paystack could not start: ${error.message || error}. Your order has not been paid. You can retry or choose bank transfer.`);
+    if (button) button.disabled = false;
   }
-
-  const { error: linkError } = await sb.from("payment_reports").update({ order_id: o.id }).eq("id", reportId).eq("user_id", user.id).eq("status", "reported");
-  if (linkError) console.warn("Order created but payment report could not be linked:", linkError.message);
-  await sb.from("shipment_updates").insert({ order_id: o.id, status: "Order received", message: "Order received; payment awaits admin verification." });
-  const { error: notifyError } = await sb.rpc("notify_admins_checkout_event", {
-    p_title: "New order placed",
-    p_message: `Order ${o.id.slice(0, 8)}: ${$("coName").value.trim()} · ${$("coPhone").value.trim()} · ${money(total)}. Payment is awaiting verification.`,
-    p_type: "new_order", p_order_id: o.id,
-  });
-  if (notifyError) console.warn("Admin new-order notification failed:", notifyError.message);
-  await sendOrderEmail("new_order", o.id);
-  sessionStorage.removeItem(reportKey);
-  cart = []; saveCart();
-  msg("checkoutMsg", "Order placed. Your bank transfer is awaiting store verification. Check My Orders for updates.", true);
-  setTimeout(() => openOrders(), 600);
 }
 
 async function handlePaystackReturn() {
   const params = new URLSearchParams(window.location.search);
-  if (params.get("paystack") !== "callback") return;
+  if (params.get("paystack") !== "return") return;
   const orderId = params.get("order_id");
-  const reference = params.get("reference") || params.get("trxref");
-  history.replaceState({}, document.title, window.location.pathname);
+  const reference = params.get("reference");
+  const trxref = params.get("trxref");
+  const paymentReference = reference || trxref;
+  if (!orderId || !paymentReference) {
+    msg("checkoutMsg", "Paystack did not return a complete payment reference. Check My Orders before trying again.");
+    return;
+  }
+  if (!user) {
+    msg("authMsg", "Please sign in again to verify your Paystack payment.");
+    show("authView");
+    return;
+  }
   show("checkoutView");
-  if (!user) { msg("checkoutMsg", "Please sign in with the same account you used to pay, then contact store support if this page does not verify automatically."); return; }
-  if (!orderId || !reference) { msg("checkoutMsg", "Paystack did not return a payment reference. Check My Orders or contact store support before trying to pay again."); return; }
   msg("checkoutMsg", "Verifying your Paystack payment securely…");
   try {
-    const { data, error } = await sb.functions.invoke("paystack-verify", { body: { order_id: orderId, reference } });
-    if (error) throw new Error(error.message || "Verification request failed.");
-    if (!(data?.success === true || data?.status === "success" || data?.verified === true || data?.data?.status === "success"))
-      throw new Error(data?.error || data?.message || "Paystack has not confirmed this payment yet.");
-    const { data: order, error: orderError } = await sb.from("orders").select("*").eq("id", orderId).eq("user_id", user.id).single();
-    if (orderError || !order) throw new Error("Payment was checked, but the order could not be loaded. Please contact store support with order ID " + orderId);
-    await sb.from("shipment_updates").insert({ order_id: orderId, status: "Order received", message: "Paystack payment verified successfully. Your order is awaiting processing." });
-    const { error: notifyError } = await sb.rpc("notify_admins_checkout_event", { p_title: "Paystack payment received", p_message: `Order ${orderId.slice(0,8)}: ${order.customer_name} · ${money(order.total)} paid through Paystack.`, p_type: "new_order", p_order_id: orderId });
-    if (notifyError) console.warn("Admin Paystack order notification failed:", notifyError.message);
+    const { data, error } = await sb.functions.invoke("paystack-verify", {
+      body: { order_id: orderId, reference: paymentReference },
+    });
+    if (error) throw error;
+    if (data?.success !== true && data?.status !== "success" && data?.data?.status !== "success")
+      throw new Error(data?.error || "Paystack has not confirmed this payment yet.");
+    const { data: order, error: orderError } = await sb.from("orders").select("id,total,customer_name,customer_phone").eq("id", orderId).eq("user_id", user.id).single();
+    if (orderError) throw orderError;
+    await sb.from("shipment_updates").insert({ order_id: orderId, status: "Order received", message: "Paystack payment confirmed. Your order is being processed." });
+    const { error: notifyError } = await sb.rpc("notify_admins_checkout_event", {
+      p_title: "Paid order received",
+      p_message: `Order ${orderId.slice(0, 8)}: ${order.customer_name || "Customer"} · ${order.customer_phone || ""} · ${money(order.total)}. Paystack payment confirmed.`,
+      p_type: "new_order",
+      p_order_id: orderId,
+    });
+    if (notifyError) console.warn("Admin payment notification failed:", notifyError.message);
     await sendOrderEmail("new_order", orderId);
-    sessionStorage.removeItem("bav_paystack_pending_order");
-    cart = []; saveCart();
-    msg("checkoutMsg", "Paystack payment verified. Your order is placed; check My Orders for updates.", true);
+    cart = [];
+    saveCart();
+    window.history.replaceState({}, document.title, window.location.pathname);
+    msg("checkoutMsg", "Payment confirmed! Your order has been placed.", true);
     setTimeout(() => openOrders(), 900);
-  } catch (err) {
-    msg("checkoutMsg", "We could not confirm the payment yet: " + (err?.message || err) + ". Do not pay again. Check My Orders or contact store support.");
+  } catch (error) {
+    console.error("Paystack verification failed:", error);
+    msg("checkoutMsg", `Payment verification is not confirmed yet: ${error.message || error}. Do not pay again until you check your order status.`);
   }
+}
+
+async function submitOrder(e) {
+  e.preventDefault();
+  if (!user) return msg("checkoutMsg", "Please sign in first.");
+  if (!cart.length) return msg("checkoutMsg", "Cart is empty.");
+  const paymentMethod = $("coPayment")?.value || "bank_transfer";
+  if (paymentMethod === "paystack") return submitPaystackOrder();
+  const reportKey = checkoutReportKey();
+  const reportId = reportKey ? sessionStorage.getItem(reportKey) : null;
+  if (paymentMethod !== "bank_transfer" || !reportId)
+    return msg(
+      "checkoutMsg",
+      "For bank transfer, transfer the total and tap “I Have Paid” before placing your order."
+    );
+  
+const subtotal = cart.reduce((a, x) => a + x.price * x.qty, 0);
+const shippingFee = 3000;
+const total = subtotal + shippingFee;
+  
+  const payload = {
+    
+user_id: user.id,
+subtotal,
+shipping_fee: shippingFee,
+total,
+payment_method: "bank_transfer",
+    
+    payment_status: "pending",
+    order_status: "processing",
+    customer_name: $("coName").value.trim(),
+    customer_phone: $("coPhone").value.trim(),
+    delivery_address: $("coAddress").value.trim(),
+    notes: `Contact email for this order: ${$("coEmail").value.trim()}. Customer reported payment; awaiting admin verification.` ,
+  };
+  const { data: o, error } = await sb
+    .from("orders")
+    .insert(payload)
+    .select()
+    .single();
+  if (error) return msg("checkoutMsg", error.message);
+  const items = cart.map((x) => ({
+    order_id: o.id,
+    product_id: x.id,
+    product_name: x.name,
+    product_price: x.price,
+    quantity: x.qty,
+    image_url: x.image_url,
+    size: x.size || null,
+    color: x.color || null,
+  }));
+  const { error: ie } = await sb.from("order_items").insert(items);
+  if (ie) {
+    await sb.from("orders").delete().eq("id", o.id);
+    return msg("checkoutMsg", ie.message);
+  }
+  const { error: linkError } = await sb
+    .from("payment_reports")
+    .update({ order_id: o.id })
+    .eq("id", reportId)
+    .eq("user_id", user.id)
+    .eq("status", "reported");
+  if (linkError)
+    console.warn(
+      "Order created but payment report could not be linked:",
+      linkError.message
+    );
+  await sb.from("shipment_updates").insert({
+    order_id: o.id,
+    status: "Order received",
+    message: "Order received; payment awaits admin verification.",
+  });
+  const { error: notifyError } = await sb.rpc("notify_admins_checkout_event", {
+    p_title: "New order placed",
+    p_message: `Order ${o.id.slice(0, 8)}: ${$("coName").value.trim()} · ${$( "coPhone" ).value.trim()} · ${money(total)}. Payment is awaiting verification.`,
+    p_type: "new_order",
+    p_order_id: o.id,
+  });
+  if (notifyError)
+    console.warn("Admin new-order notification failed:", notifyError.message);
+  await sendOrderEmail("new_order", o.id);
+  sessionStorage.removeItem(reportKey);
+  cart = [];
+  saveCart();
+  msg(
+    "checkoutMsg",
+    "Order placed. Your payment is awaiting store verification. Check My Orders for updates.",
+    true
+  );
+  setTimeout(() => openOrders(), 600);
 }
 async function openOrders() {
   show("ordersView");
@@ -1059,6 +1172,7 @@ async function init() {
     await loadProfile();
     show("homeView");
     await loadProducts();
+    await handlePaystackReturn();
   } else show("authView");
   sb.channel("bav-order-notifications")
     .on(
@@ -1618,7 +1732,7 @@ document.querySelector(".brand").addEventListener("click", (e) => {
 });
 saveCart();
 bindAccountAndBottomNavigation();
-init().then(() => handlePaystackReturn()).catch((err) => console.error("App initialization failed:", err));
+init();
 
 // Refresh the admin notification badge while the admin dashboard is open.
 setInterval(() => {
@@ -1873,4 +1987,3 @@ if (changePasswordForm) {
     }
   };
 }
-
