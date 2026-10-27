@@ -223,8 +223,16 @@ async function manageOrder(id){
   const {data:o,error}=await sb.from('orders').select('*').eq('id',id).single();
   if(error)return alert(error.message);
 
-  const {data:orderItems}=await sb.from('order_items').select('*').eq('order_id',id);
-  const orderedProductsHtml=(orderItems||[]).map(item=>`<div class="summary"><b>${esc(item.product_name||'Product')}</b><p>Quantity: ${Number(item.quantity)||0} · Unit price: ${money(item.product_price)}</p>${item.size?`<p>Size: ${esc(item.size)}</p>`:''}${item.color?`<p>Color: ${esc(item.color)}</p>`:''}</div>`).join('')||'<p class="muted">No order items found.</p>';
+  const {data:orderItems,error:itemsError}=await sb.from('order_items').select('*').eq('order_id',id);
+  const orderedProductsHtml=itemsError
+    ? `<p class="muted">Could not load ordered products: ${esc(itemsError.message)}. Check the order_items table permissions (RLS) in Supabase.</p>`
+    : (orderItems||[]).map(item=>`<div class="summary" style="display:flex;gap:12px;align-items:flex-start;margin:10px 0">
+        ${item.image_url?`<img src="${esc(item.image_url)}" alt="${esc(item.product_name||'Product')}" style="width:84px;height:84px;object-fit:contain;border-radius:8px">`:''}
+        <div><b>${esc(item.product_name||'Product')}</b>
+        <p>Quantity: ${Number(item.quantity)||0} · Unit price: ${money(item.product_price)}</p>
+        ${item.size?`<p>Size: ${esc(item.size)}</p>`:''}
+        ${item.color?`<p>Color: ${esc(item.color)}</p>`:''}</div>
+      </div>`).join('')||'<p class="muted">No order items are saved for this order. If this is an older order, its items may not have been saved; a new test order will confirm checkout.</p>';
   const {data:ups}=await sb.from('shipment_updates').select('*')
     .eq('order_id',id).order('created_at',{ascending:false});
 
