@@ -12,19 +12,22 @@ const img=u=>u||'images/logo.png';
 function showDenied(){
   $('checking').classList.add('hidden');
   $('adminApp').classList.add('hidden');
+  $('adminLogin')?.classList.add('hidden');
   $('denied').classList.remove('hidden');
 }
 
 async function check(){
   if(!sb)return showDenied();
   const {data:{session}}=await sb.auth.getSession();
-  if(!session)return showDenied();
+  if(!session){ $('checking').classList.add('hidden'); $('denied').classList.add('hidden'); $('adminLogin')?.classList.remove('hidden'); return; }
 
   adminUser=session.user;
   const {data:p}=await sb.from('profiles').select('role').eq('id',session.user.id).single();
-  if(p?.role!=='admin')return showDenied();
+  if(p?.role!=='admin'){ await sb.auth.signOut(); $('checking').classList.add('hidden'); $('adminApp').classList.add('hidden'); $('denied').classList.add('hidden'); $('adminLogin')?.classList.remove('hidden'); if($('adminLoginMsg'))$('adminLoginMsg').textContent='This account does not have the admin role.'; return; }
 
   $('checking').classList.add('hidden');
+  $('adminLogin')?.classList.add('hidden');
+  $('denied').classList.add('hidden');
   $('adminApp').classList.remove('hidden');
   await loadProducts();
   await loadOrders();
@@ -169,37 +172,42 @@ function openProduct(p){
   $('productPrice').value=p?.price??'';
   $('productStock').value=p?.stock??0;
   $('productDescription').value=p?.description||'';
+  $('productSizes').value=Array.isArray(p?.sizes)?p.sizes.join(', '):'';
+  $('productColors').value=Array.isArray(p?.colors)?p.colors.join(', '):'';
   $('productImage').value='';
-  $('imagePreview').innerHTML=p?.image_url?`<img class="preview" src="${esc(p.image_url)}">`:'';
+  const imgs=Array.isArray(p?.images)?p.images:(p?.image_url?[p.image_url]:[]);
+  $('imagePreview').innerHTML=imgs.map(u=>`<img class="preview" style="max-width:90px;margin:4px" src="${esc(u)}">`).join('');
   $('productMsg').textContent='';
   $('productModal').classList.remove('hidden');
 }
-
 async function saveProduct(e){
   e.preventDefault();
-  let id=$('productId').value,file=$('productImage').files[0],image_url=null;
-
-  if(file){
-    let ext=(file.name.split('.').pop()||'jpg').toLowerCase();
-    let path=`${crypto.randomUUID()}.${ext}`;
-    let {error}=await sb.storage.from('product-images').upload(path,file,{upsert:false,contentType:file.type});
-    if(error){$('productMsg').textContent=error.message;return}
-    image_url=sb.storage.from('product-images').getPublicUrl(path).data.publicUrl;
+  const id=$('productId').value, files=Array.from($('productImage').files||[]);
+  const {data:old}=id?await sb.from('products').select('image_url,images').eq('id',id).single():{data:null};
+  let imageUrls=Array.isArray(old?.images)?[...old.images]:(old?.image_url?[old.image_url]:[]);
+  if(files.length){
+    imageUrls=[];
+    for(const file of files){
+      const ext=(file.name.split('.').pop()||'jpg').toLowerCase();
+      const path=`${crypto.randomUUID()}.${ext}`;
+      const {error}=await sb.storage.from('product-images').upload(path,file,{upsert:false,contentType:file.type});
+      if(error){$('productMsg').textContent=error.message;return;}
+      imageUrls.push(sb.storage.from('product-images').getPublicUrl(path).data.publicUrl);
+    }
   }
-
-  let payload={
+  const parseList=value=>[...new Set(String(value||'').split(',').map(x=>x.trim()).filter(Boolean))];
+  const payload={
     name:$('productName').value.trim(),
-    category:$('productCategory').value,
+    category:$('productCategory').value.trim(),
     price:Number($('productPrice').value),
     stock:Number($('productStock').value),
-    description:$('productDescription').value.trim()
+    description:$('productDescription').value.trim(),
+    sizes:parseList($('productSizes').value),
+    colors:parseList($('productColors').value)
   };
-
-  if(image_url)payload.image_url=image_url;
-
-  let r=id?await sb.from('products').update(payload).eq('id',id):await sb.from('products').insert(payload);
-
-  if(r.error){$('productMsg').textContent=r.error.message;return}
+  if(imageUrls.length){payload.images=imageUrls;payload.image_url=imageUrls[0];}
+  const r=id?await sb.from('products').update(payload).eq('id',id):await sb.from('products').insert(payload);
+  if(r.error){$('productMsg').textContent=r.error.message+' If it mentions images, sizes or colors, run the supplied Supabase SQL setup first.';return;}
   $('productModal').classList.add('hidden');
   await loadProducts();
 }
@@ -215,6 +223,8 @@ async function manageOrder(id){
   const {data:o,error}=await sb.from('orders').select('*').eq('id',id).single();
   if(error)return alert(error.message);
 
+  const {data:orderItems}=await sb.from('order_items').select('*').eq('order_id',id);
+  const orderedProductsHtml=(orderItems||[]).map(item=>`<div class="summary"><b>${esc(item.product_name||'Product')}</b><p>Quantity: ${Number(item.quantity)||0} · Unit price: ${money(item.product_price)}</p>${item.size?`<p>Size: ${esc(item.size)}</p>`:''}${item.color?`<p>Color: ${esc(item.color)}</p>`:''}</div>`).join('')||'<p class="muted">No order items found.</p>';
   const {data:ups}=await sb.from('shipment_updates').select('*')
     .eq('order_id',id).order('created_at',{ascending:false});
 
@@ -222,6 +232,7 @@ async function manageOrder(id){
     <h2>Manage Order ${id.slice(0,8)}</h2>
     <p>${esc(o.customer_name)} · ${esc(o.customer_phone)}</p>
     <p>${esc(o.delivery_address)}</p>
+    <h3>Ordered products</h3>${orderedProductsHtml}
     <label>Payment status<select id="mPay">
       <option ${o.payment_status==='pending'?'selected':''}>pending</option>
       <option ${o.payment_status==='paid'?'selected':''}>paid</option>
@@ -310,7 +321,26 @@ if($('adminMessagesBtn'))$('adminMessagesBtn').onclick=async()=>{
 
 if($('refreshAdminMessages'))$('refreshAdminMessages').onclick=loadNotifications;
 
+$('productImage')?.addEventListener('change',()=>{
+  const files=Array.from($('productImage').files||[]);
+  $('imagePreview').innerHTML=files.map(file=>`<img class="preview" style="max-width:90px;margin:4px" src="${URL.createObjectURL(file)}" alt="${esc(file.name)}">`).join('');
+});
 $('productForm').onsubmit=saveProduct;
+if($('adminLoginForm')) $('adminLoginForm').onsubmit=async e=>{
+  e.preventDefault();
+  $('adminLoginMsg').textContent='Signing in…';
+  const {error}=await sb.auth.signInWithPassword({email:$('adminLoginEmail').value.trim(),password:$('adminLoginPassword').value});
+  if(error){$('adminLoginMsg').textContent=error.message;return;}
+  $('adminLoginMsg').textContent='';
+  $('checking').classList.remove('hidden');
+  $('adminLogin').classList.add('hidden');
+  await check();
+};
+if($('deniedLoginAgain')) $('deniedLoginAgain').onclick=async()=>{
+  await sb.auth.signOut();
+  $('denied').classList.add('hidden');
+  $('adminLogin').classList.remove('hidden');
+};
 $('adminLogout').onclick=async()=>{await sb.auth.signOut();location.href='./'};
 $('backHome').onclick=()=>location.href='./';
 $('deniedLogin').onclick=()=>location.href='./';

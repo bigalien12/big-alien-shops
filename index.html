@@ -283,11 +283,14 @@
   <form id="productForm">
     <input type="hidden" id="productId">
     <label>Product name<input id="productName" required></label>
-    <label>Category<select id="productCategory"><option>Solar</option><option>Food</option><option>Men</option><option>Electronics</option><option>Other</option></select></label>
+    <label>Category<select id="productCategory"><option>Solar</option><option>Food</option><option>Men</option><option>Clothes</option><option>Shoes</option><option>Electronics</option><option>Other</option></select></label>
     <label>Price (₦)<input id="productPrice" type="number" min="0" required></label>
     <label>Stock<input id="productStock" type="number" min="0" required></label>
-    <label>Description<textarea id="productDescription"></textarea></label>
-    <label>Product picture<input id="productImage" type="file" accept="image/*"></label>
+    <label>Description<textarea id="productDescription" placeholder="Product details customers should see"></textarea></label>
+    <label>Available sizes (for clothes/shoes; separate with commas)<input id="productSizes" placeholder="S, M, L, XL, 40, 41, 42"></label>
+    <label>Available colors (separate with commas)<input id="productColors" placeholder="Black, White, Blue"></label>
+    <label>Product pictures (select multiple pictures for this one product)<input id="productImage" type="file" accept="image/*" multiple></label>
+    <p class="small muted">You can select several photos at once. The first photo is the main product photo.</p>
     <div id="imagePreview"></div>
     <button class="primary" type="submit">Save Product</button><div id="productMsg" class="msg"></div>
   </form>

@@ -198,30 +198,51 @@ async function loadProducts() {
 function productById(id) {
   return products.find((p) => String(p.id) === String(id));
 }
+function productImages(p) {
+  const list = Array.isArray(p?.images) ? p.images.filter(Boolean) : [];
+  if (p?.image_url && !list.includes(p.image_url)) list.unshift(p.image_url);
+  return list.length ? list : [imageOrFallback(p?.image_url)];
+}
+function needsVariants(p) {
+  return /clothes|clothing|shoe|men|women|apparel|wear/i.test(String(p?.category || ""));
+}
+let activeProductImages = [];
 function openProduct(id) {
-  let p = productById(id);
+  const p = productById(id);
   if (!p) return;
+  const images = productImages(p);
+  activeProductImages = images;
+  const sizes = Array.isArray(p.sizes) ? p.sizes : [];
+  const colors = Array.isArray(p.colors) ? p.colors : [];
+  const variants = needsVariants(p);
+  const missingVariantSetup = variants && (!sizes.length || !colors.length);
   show("productView");
-  $("productView").innerHTML = `<div class="productDetail"><div><img src="${esc( imageOrFallback(p.image_url) )}" alt="${esc(p.name)}"></div><div><div class="muted">${esc( p.category )}</div><h1>${esc(p.name)}</h1><div class="price">${money( p.price )}</div><p>${esc(p.description)}</p><div class="stockBadge ${p.stock > 0 ? "inStock" : "outStock"}">${p.stock > 0 ? "● In Stock" : "Out of Stock"}</div><label>Quantity<input id="buyQty" type="number" min="1" max="${ p.stock }" value="1"></label><button class="primary" id="addToCart" ${p.stock < 1 ? "disabled" : ""}>🛒 Add to Cart</button><button class="secondary" id="buyNow" ${p.stock < 1 ? "disabled" : ""}>Buy Now</button></div></div>`;
-  $("addToCart").onclick = () => {
-    let q = Number($("buyQty").value);
-    addCart(p, q);
-    show("cartView");
-    renderCart();
+  $("productView").innerHTML = `<div class="productDetail"><div class="productGallery"><img id="productMainImage" src="${esc(images[0])}" alt="${esc(p.name)}">${images.length > 1 ? `<div class="productImageThumbs">${images.map((url,i)=>`<button type="button" class="secondary" data-product-image="${i}" aria-label="View product photo ${i+1}"><img src="${esc(url)}" alt="Photo ${i+1}" style="width:64px;height:64px;object-fit:cover"></button>`).join("")}</div>` : ""}</div><div><div class="muted">${esc(p.category)}</div><h1>${esc(p.name)}</h1><div class="price">${money(p.price)}</div><p>${esc(p.description || "")}</p><div class="stockBadge ${p.stock > 0 ? "inStock" : "outStock"}">${p.stock > 0 ? "● In Stock" : "Out of Stock"}</div>${missingVariantSetup ? `<p class="muted">Size and color options are not yet configured for this item. Please contact the store before ordering.</p>` : ""}${variants && !missingVariantSetup ? `${sizes.length ? `<label>Choose size<select id="buySize" required><option value="">Select size</option>${sizes.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join("")}</select></label>` : ""}${colors.length ? `<label>Choose color<select id="buyColor" required><option value="">Select color</option>${colors.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("")}</select></label>` : ""}` : ""}<label>Quantity<input id="buyQty" type="number" min="1" max="${p.stock}" value="1"></label><button class="primary" id="addToCart" ${p.stock < 1 || missingVariantSetup ? "disabled" : ""}>🛒 Add to Cart</button><button class="secondary" id="buyNow" ${p.stock < 1 || missingVariantSetup ? "disabled" : ""}>Buy Now</button></div></div>`;
+  const selectedVariants = () => {
+    if (missingVariantSetup) { alert("The store owner must configure sizes and colors for this clothing/shoe item before it can be ordered."); return null; }
+    const size = $("buySize")?.value || "";
+    const color = $("buyColor")?.value || "";
+    if (variants && sizes.length && !size) { alert("Please select a size first."); return null; }
+    if (variants && colors.length && !color) { alert("Please select a color first."); return null; }
+    return {size, color};
   };
-  $("buyNow").onclick = () => {
-    let q = Number($("buyQty").value);
-    addCart(p, q);
-    show("checkoutView");
-    prefillCheckout();
+  const addSelected = () => {
+    const v = selectedVariants();
+    if (!v) return false;
+    const q = Number($("buyQty").value);
+    if (!Number.isInteger(q) || q < 1) { alert("Please enter a valid quantity."); return false; }
+    addCart(p, q, v);
+    return true;
   };
+  $("addToCart").onclick = () => { if (addSelected()) { show("cartView"); renderCart(); } };
+  $("buyNow").onclick = () => { if (addSelected()) { show("checkoutView"); prefillCheckout(); } };
 }
 function productStock(p, fallback = 0) {
   const raw = p?.stock ?? fallback;
   const n = Number(raw);
   return Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
 }
-function addCart(p, q) {
+function addCart(p, q, variants = {}) {
   if (!p) return;
   q = Math.max(1, Math.floor(Number(q) || 1));
   const stock = productStock(p);
@@ -229,7 +250,8 @@ function addCart(p, q) {
     alert("This product is currently out of stock. Please contact the store owner.");
     return;
   }
-  const x = cart.find((item) => String(item.id) === String(p.id));
+  const size = variants.size || "", color = variants.color || "";
+  const x = cart.find((item) => String(item.id) === String(p.id) && (item.size || "") === size && (item.color || "") === color);
   const currentQty = x ? Math.max(0, Number(x.qty) || 0) : 0;
   const requestedQty = currentQty + q;
   if (requestedQty > stock) {
@@ -242,6 +264,7 @@ function addCart(p, q) {
     x.price = Number(p.price ?? x.price) || 0;
     x.name = p.name || x.name;
     x.image_url = p.image_url || x.image_url;
+    x.images = productImages(p);
   } else {
     cart.push({
       id: p.id,
@@ -249,7 +272,8 @@ function addCart(p, q) {
       name: p.name,
       price: Number(p.price) || 0,
       image_url: p.image_url,
-      stock,
+      images: productImages(p),
+      size, color, stock,
     });
   }
   saveCart();
@@ -270,7 +294,7 @@ function renderCart() {
   $("cartItems").innerHTML = cart.map((item) => {
     const stock = productStock(item, 0);
     const qty = Math.min(stock || Number(item.qty) || 1, Number(item.qty) || 1);
-    return `<div class="cartRow"><img src="${esc(imageOrFallback(item.image_url))}" alt="${esc(item.name)}"><div class="cartProductInfo" style="flex:1;min-width:100px"><b>${esc(item.name)}</b><div>${money(item.price)} × ${qty}</div><small class="muted">${stock} available</small></div><button class="secondary" type="button" data-minus="${esc(item.id)}" aria-label="Decrease ${esc(item.name)} quantity" ${qty <= 1 ? "disabled" : ""}>−</button><b aria-label="Quantity">${qty}</b><button class="secondary" type="button" data-plus="${esc(item.id)}" aria-label="Increase ${esc(item.name)} quantity" ${stock <= qty ? "" : ""}>+</button><button class="danger" type="button" data-remove="${esc(item.id)}">Remove</button></div>`;
+    return `<div class="cartRow"><img src="${esc(imageOrFallback(item.image_url))}" alt="${esc(item.name)}"><div class="cartProductInfo" style="flex:1;min-width:100px"><b>${esc(item.name)}</b>${item.size ? `<div>Size: ${esc(item.size)}</div>` : ""}${item.color ? `<div>Color: ${esc(item.color)}</div>` : ""}<div>${money(item.price)} × ${qty}</div><small class="muted">${stock} available</small></div><button class="secondary" type="button" data-minus="${esc(item.id)}" data-size="${esc(item.size || "")}" data-color="${esc(item.color || "")}" aria-label="Decrease ${esc(item.name)} quantity" ${qty <= 1 ? "disabled" : ""}>−</button><b aria-label="Quantity">${qty}</b><button class="secondary" type="button" data-plus="${esc(item.id)}" data-size="${esc(item.size || "")}" data-color="${esc(item.color || "")}" aria-label="Increase ${esc(item.name)} quantity" ${stock <= qty ? "" : ""}>+</button><button class="danger" type="button" data-remove="${esc(item.id)}" data-size="${esc(item.size || "")}" data-color="${esc(item.color || "")}">Remove</button></div>`;
   }).join("");
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
 const shippingFee = 3000;
@@ -527,6 +551,8 @@ payment_method: "bank_transfer",
     product_price: x.price,
     quantity: x.qty,
     image_url: x.image_url,
+    size: x.size || null,
+    color: x.color || null,
   }));
   const { error: ie } = await sb.from("order_items").insert(items);
   if (ie) {
@@ -895,6 +921,8 @@ async function loadAdminOrders() {
            ${orderItems.map((item) => `
              <div class="adminOrderItem">
                <b>${esc(item.product_name || "Product")}</b>
+               ${item.size ? `<p>Size: ${esc(item.size)}</p>` : ""}
+               ${item.color ? `<p>Color: ${esc(item.color)}</p>` : ""}
                <p>Quantity: ${Number(item.quantity) || 0}</p>
                <p>Unit price: ${money(item.product_price)}</p>
                <p>Line total: ${money(
@@ -934,44 +962,48 @@ function openProductModal(p = null) {
   $("productPrice").value = p?.price || "";
   $("productStock").value = p?.stock ?? 0;
   $("productDescription").value = p?.description || "";
-  $("imagePreview").innerHTML = p?.image_url
-    ? `<img class="preview" src="${esc(p.image_url)}">`
-    : "";
+  $("productSizes").value = Array.isArray(p?.sizes) ? p.sizes.join(", ") : "";
+  $("productColors").value = Array.isArray(p?.colors) ? p.colors.join(", ") : "";
+  const previews = p ? productImages(p).filter(u => u && !String(u).includes("logo.png")) : [];
+  $("imagePreview").innerHTML = previews.map(url => `<img class="preview" style="max-width:90px;margin:4px" src="${esc(url)}">`).join("");
   $("productImage").value = "";
   $("productMsg").textContent = "";
   $("productModal").classList.remove("hidden");
 }
 async function saveProduct(e) {
   e.preventDefault();
-  let id = $("productId").value;
-  let imageUrl = null;
-  let file = $("productImage").files[0];
-  if (file) {
-    let ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-    let path = `${crypto.randomUUID()}.${ext}`;
-    let { error: up } = await sb.storage
-      .from("product-images")
-      .upload(path, file, { upsert: false, contentType: file.type });
-    if (up) return msg("productMsg", up.message);
-    let { data } = sb.storage.from("product-images").getPublicUrl(path);
-    imageUrl = data.publicUrl;
+  const id = $("productId").value;
+  const files = Array.from($("productImage").files || []);
+  const existing = productById(id);
+  let imageUrls = Array.isArray(existing?.images) ? [...existing.images] : (existing?.image_url ? [existing.image_url] : []);
+  if (files.length) {
+    imageUrls = [];
+    for (const file of files) {
+      const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const path = `${crypto.randomUUID()}.${ext}`;
+      const { error: up } = await sb.storage.from("product-images").upload(path, file, {upsert:false, contentType:file.type});
+      if (up) return msg("productMsg", up.message);
+      imageUrls.push(sb.storage.from("product-images").getPublicUrl(path).data.publicUrl);
+    }
   }
-  let payload = {
+  const parseList = value => [...new Set(String(value || "").split(",").map(x => x.trim()).filter(Boolean))];
+  const payload = {
     name: $("productName").value.trim(),
     category: $("productCategory").value,
     price: Number($("productPrice").value),
     stock: Number($("productStock").value),
     description: $("productDescription").value.trim(),
+    sizes: parseList($("productSizes").value),
+    colors: parseList($("productColors").value)
   };
-  if (imageUrl) payload.image_url = imageUrl;
-  let res = id
-    ? await sb.from("products").update(payload).eq("id", id)
-    : await sb.from("products").insert(payload);
-  if (res.error) return msg("productMsg", res.error.message);
+  if (imageUrls.length) { payload.images = imageUrls; payload.image_url = imageUrls[0]; }
+  const res = id ? await sb.from("products").update(payload).eq("id", id) : await sb.from("products").insert(payload);
+  if (res.error) return msg("productMsg", res.error.message + " If it mentions sizes, colors or images, run the supplied Supabase SQL setup first.");
   $("productModal").classList.add("hidden");
   await loadProducts();
   await loadAdminProducts();
 }
+
 async function deleteProduct(id) {
   if (!confirm("Delete this product?")) return;
   let { error } = await sb.from("products").delete().eq("id", id);
@@ -1192,6 +1224,7 @@ document.addEventListener("click", async (e) => {
     renderProducts();
   }
   if (t.dataset.product) openProduct(t.dataset.product);
+  if (t.dataset.productImage !== undefined) { const main = $("productMainImage"); if (main && activeProductImages[Number(t.dataset.productImage)]) main.src = activeProductImages[Number(t.dataset.productImage)]; }
   if (t.dataset.wishlistRemove) {
     toggleWishlist(t.dataset.wishlistRemove);
   }
@@ -1254,7 +1287,7 @@ document.addEventListener("click", async (e) => {
     prefillCheckout();
   }
   if (t.dataset.minus) {
-    let x = cart.find((x) => String(x.id) === String(t.dataset.minus));
+    let x = cart.find((x) => String(x.id) === String(t.dataset.minus) && (x.size || "") === (t.dataset.size || "") && (x.color || "") === (t.dataset.color || ""));
     if (x) {
       x.qty = Math.max(1, x.qty - 1);
       saveCart();
@@ -1262,7 +1295,7 @@ document.addEventListener("click", async (e) => {
     }
   }
   if (t.dataset.plus) {
-    const item = cart.find((row) => String(row.id) === String(t.dataset.plus));
+    const item = cart.find((row) => String(row.id) === String(t.dataset.plus) && (row.size || "") === (t.dataset.size || "") && (row.color || "") === (t.dataset.color || ""));
     const product = productById(t.dataset.plus);
     if (item) {
       const stock = product ? productStock(product, item.stock) : productStock(item, 0);
@@ -1280,7 +1313,7 @@ document.addEventListener("click", async (e) => {
     }
   }
   if (t.dataset.remove) {
-    cart = cart.filter((x) => String(x.id) !== String(t.dataset.remove));
+    cart = cart.filter((x) => !(String(x.id) === String(t.dataset.remove) && (x.size || "") === (t.dataset.size || "") && (x.color || "") === (t.dataset.color || "")));
     saveCart();
     renderCart();
   }
@@ -1578,6 +1611,13 @@ if ($("sendReviewBtn"))
       "noopener"
     );
   };
+$("productImage")?.addEventListener("change", () => {
+  const files = Array.from($("productImage").files || []);
+  $("imagePreview").innerHTML = files.map(file => {
+    const url = URL.createObjectURL(file);
+    return `<img class="preview" style="max-width:90px;margin:4px" src="${url}" alt="${esc(file.name)}">`;
+  }).join("");
+});
 $("productForm").onsubmit = saveProduct;
 $("addProductBtn").onclick = () => openProductModal();
 $("adminLogout").onclick = () => show("homeView");
