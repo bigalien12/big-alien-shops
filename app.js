@@ -204,7 +204,7 @@ function productImages(p) {
   return list.length ? list : [imageOrFallback(p?.image_url)];
 }
 function needsVariants(p) {
-  return /clothes|clothing|shoe|men|women|apparel|wear/i.test(String(p?.category || ""));
+  return /clothes|clothing|shoe|men|women|apparel|wear|fashion/i.test(String(p?.category || ""));
 }
 let activeProductImages = [];
 function openProduct(id) {
