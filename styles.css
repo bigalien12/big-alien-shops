@@ -176,3 +176,20 @@ body.dark .productTrust>div>span{background:#1d3558}
 .productReviews h2{margin:0 0 12px}.reviewSummary{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--line)}
 .reviewSummary strong{font-size:22px;color:var(--blue)}.reviewStars{color:#e5a000;letter-spacing:2px;font-size:18px}.reviewForm{display:grid;gap:9px;padding:16px 0;border-bottom:1px solid var(--line)}.reviewForm h3{margin:0}.reviewForm label{margin-top:4px}.reviewForm button{justify-self:start}.reviewList{display:grid;gap:10px;margin-top:12px}.reviewCard{border:1px solid var(--line);border-radius:12px;padding:13px}.reviewCardHead{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.reviewCard p{margin:8px 0}.reviewSuccess{padding:12px;background:#ecfdf5;color:#166534;border-radius:10px}.adminReviewCard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:15px;margin:10px 0}.adminReviewActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.adminReviewActions .approveReview{background:#15803d;color:#fff;border-color:#15803d}.adminReviewActions .rejectReview{background:#dc2626;color:#fff;border-color:#dc2626}
 body.dark .productReviews,body.dark .reviewCard,body.dark .adminReviewCard{background:var(--card,#172033);color:var(--ink)}
+
+
+/* Upgrade 4 — polished customer order cards, item summaries and actions */
+.orderPlacedDate{display:block;color:var(--muted);font-size:11px;margin-top:3px}
+.orderProducts{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:12px 0;margin:12px 0}
+.orderProducts h4{margin:0 0 8px}
+.orderProductRow{display:flex;align-items:center;gap:11px;padding:9px 0;min-width:0}
+.orderProductRow img,.orderProductPlaceholder{width:54px;height:54px;flex:0 0 54px;object-fit:contain;border-radius:10px;background:var(--bg);display:grid;place-items:center}
+.orderProductDetails{display:grid;gap:3px;flex:1;min-width:0}
+.orderProductDetails b{overflow-wrap:anywhere}
+.orderProductDetails small{color:var(--muted);font-size:12px}
+.orderProductRow>strong{white-space:nowrap;font-size:13px}
+.orderActionRow{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}
+.orderActionRow button{flex:1;min-width:150px}
+.paymentStatusText{text-transform:capitalize}
+body.dark .orderProducts{border-color:var(--line)}
+@media(max-width:420px){.orderActionRow{display:grid;grid-template-columns:1fr}.orderActionRow button{width:100%}.orderProductRow img,.orderProductPlaceholder{width:46px;height:46px;flex-basis:46px}}

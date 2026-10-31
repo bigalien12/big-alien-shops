@@ -28,6 +28,8 @@ function saveCart() {
 }
 let currentView = null;
 const viewHistory = [];
+let customerOrdersCache = [];
+let customerOrderItemsCache = {};
 
 function show(id, remember = true) {
   // A deliberate return to the marketplace starts a fresh customer navigation path.
@@ -865,11 +867,21 @@ async function openOrders() {
     .order("created_at", { ascending: false });
   if (error)
     return ($("ordersList").innerHTML = `<div class="summary">${esc(error.message)}</div>`);
-  if (!data?.length)
-    return ($("ordersList").innerHTML = `<div class="summary">No orders yet.</div>`);
+  if (!data?.length) {
+    customerOrdersCache = [];
+    customerOrderItemsCache = {};
+    return ($("ordersList").innerHTML = `<div class="summary">No orders yet. Your purchases and delivery updates will appear here.</div>`);
+  }
 
+  customerOrdersCache = data;
+  customerOrderItemsCache = {};
   let html = "";
   for (const o of data) {
+    const { data: items, error: itemsError } = await sb
+      .from("order_items")
+      .select("id,product_id,product_name,product_price,quantity,image_url,size,color")
+      .eq("order_id", o.id);
+    customerOrderItemsCache[o.id] = itemsError ? [] : (items || []);
     const { data: ups, error: updatesError } = await sb
       .from("shipment_updates")
       .select("*")
@@ -881,11 +893,54 @@ async function openOrders() {
     const pickup = /ready for pickup|available for pickup|at pickup point|arrived at pickup/i.test(
       `${o.order_status || ""} ${latest?.status || ""} ${latest?.message || ""}`
     );
-    html += `<article class="orderCard"><div class="orderCardTop"><div><span class="muted">ORDER NUMBER</span><b class="orderNumber">${esc(o.id.slice(0, 8).toUpperCase())}</b></div><span class="orderCurrentBadge">${esc(stage.label)}</span></div><div class="orderMetaGrid"><div><small>Total</small><b>${money(o.total)}</b></div><div><small>Payment</small><b>${esc(o.payment_status || "Pending")}</b></div></div>${renderOrderTimeline(stage)}<div class="orderInfo"><p><b>Tracking number:</b> ${esc(o.tracking_number || "Not assigned yet")}</p><p><b>Delivery address:</b> ${esc(o.delivery_address || "Not available")}</p></div>${pickup ? `<div class="pickupNotice"><b>📦 Your item may be ready for collection.</b><p>${esc(latest?.message || "Please check the latest shipment details before travelling to collect it.")}</p></div>` : ""}<div class="shipmentHistory"><h4>Shipment updates</h4>${updates.map((u) => `<div class="shipmentUpdateRow"><span class="shipmentUpdatePin">📍</span><div><b>${esc(u.status || "Update")}</b><p>${esc(u.message || "")}</p><small>${u.created_at ? new Date(u.created_at).toLocaleString() : ""}</small></div></div>`).join("") || `<p class="muted">${updatesError ? "Shipment updates are temporarily unavailable." : "No shipment updates yet. We’ll show new updates here as the store processes your order."}</p>`}</div></article>`;
+    const orderItems = customerOrderItemsCache[o.id];
+    const itemList = orderItems.length
+      ? `<div class="orderProducts"><h4>Items in this order</h4>${orderItems.map(item => `<div class="orderProductRow">${item.image_url ? `<img src="${esc(item.image_url)}" alt="${esc(item.product_name)}">` : `<span class="orderProductPlaceholder">🛍️</span>`}<div class="orderProductDetails"><b>${esc(item.product_name || "Product")}</b><small>Qty: ${Number(item.quantity) || 1}${item.size ? ` · Size: ${esc(item.size)}` : ""}${item.color ? ` · Colour: ${esc(item.color)}` : ""}</small></div><strong>${money((Number(item.product_price) || 0) * (Number(item.quantity) || 1))}</strong></div>`).join("")}</div>`
+      : `<div class="orderProducts"><h4>Items in this order</h4><p class="muted">${itemsError ? "Order items are temporarily unavailable." : "No item details were saved for this order."}</p></div>`;
+    html += `<article class="orderCard" data-customer-order="${esc(o.id)}"><div class="orderCardTop"><div><span class="muted">ORDER NUMBER</span><b class="orderNumber">${esc(o.id.slice(0, 8).toUpperCase())}</b><small class="orderPlacedDate">${o.created_at ? new Date(o.created_at).toLocaleString() : ""}</small></div><span class="orderCurrentBadge">${esc(stage.label)}</span></div><div class="orderMetaGrid"><div><small>Order total</small><b>${money(o.total)}</b></div><div><small>Payment status</small><b class="paymentStatusText">${esc(o.payment_status || "Pending")}</b></div></div>${itemList}${renderOrderTimeline(stage)}<div class="orderInfo"><p><b>Tracking number:</b> ${esc(o.tracking_number || "Not assigned yet")}</p><p><b>Delivery address:</b> ${esc(o.delivery_address || "Not available")}</p></div>${pickup ? `<div class="pickupNotice"><b>📦 Your item may be ready for collection.</b><p>${esc(latest?.message || "Please check the latest shipment details before travelling to collect it.")}</p></div>` : ""}<div class="shipmentHistory"><h4>Shipment updates</h4>${updates.map((u) => `<div class="shipmentUpdateRow"><span class="shipmentUpdatePin">📍</span><div><b>${esc(u.status || "Update")}</b><p>${esc(u.message || "")}</p><small>${u.created_at ? new Date(u.created_at).toLocaleString() : ""}</small></div></div>`).join("") || `<p class="muted">${updatesError ? "Shipment updates are temporarily unavailable." : "No shipment updates yet. We’ll show new updates here as the store processes your order."}</p>`}</div><div class="orderActionRow"><button type="button" class="secondary" data-order-receipt="${esc(o.id)}">Download / Print receipt</button><button type="button" class="primary" data-order-reorder="${esc(o.id)}">Reorder items</button></div></article>`;
   }
   $("ordersList").innerHTML = html;
   applyOrderFilter("ongoing");
 }
+function printCustomerOrderReceipt(orderId) {
+  const order = customerOrdersCache.find(row => String(row.id) === String(orderId));
+  if (!order) return alert("Order details could not be found. Please refresh My Orders.");
+  const items = customerOrderItemsCache[orderId] || [];
+  const itemRows = items.map(item => `<tr><td>${esc(item.product_name || "Product")}${item.size ? `<br>Size: ${esc(item.size)}` : ""}${item.color ? `<br>Colour: ${esc(item.color)}` : ""}</td><td>${Number(item.quantity) || 1}</td><td>${money(item.product_price)}</td><td>${money((Number(item.product_price) || 0) * (Number(item.quantity) || 1))}</td></tr>`).join("");
+  const popup = window.open("", "_blank", "width=720,height=850");
+  if (!popup) return alert("Please allow pop-ups for this website to print your receipt.");
+  popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BIG ALIEN Receipt</title><style>body{font:15px Arial,sans-serif;color:#172033;margin:32px}header{border-bottom:3px solid #075bea;padding-bottom:14px}h1{color:#075bea;margin:0}small{color:#64748b}.meta{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:22px 0}.meta div{background:#f1f5fb;padding:12px;border-radius:8px}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{text-align:left;padding:11px 7px;border-bottom:1px solid #dbe3ef}th{background:#f1f5fb}.total{text-align:right;font-size:20px;font-weight:bold;margin-top:22px}.foot{margin-top:35px;color:#64748b}@media print{button{display:none}body{margin:15mm}}</style></head><body><header><h1>BIG ALIEN</h1><b>Big Alien Venture 👽</b><p>Order receipt</p></header><div class="meta"><div><small>ORDER NUMBER</small><br><b>${esc(order.id.slice(0,8).toUpperCase())}</b></div><div><small>ORDER DATE</small><br><b>${order.created_at ? new Date(order.created_at).toLocaleString() : "—"}</b></div><div><small>PAYMENT STATUS</small><br><b>${esc(order.payment_status || "Pending")}</b></div><div><small>ORDER STATUS</small><br><b>${esc(order.order_status || "Processing")}</b></div></div><p><b>Customer:</b> ${esc(order.customer_name || "")}</p><p><b>Delivery address:</b> ${esc(order.delivery_address || "")}</p><table><thead><tr><th>Item</th><th>Qty</th><th>Unit price</th><th>Amount</th></tr></thead><tbody>${itemRows || "<tr><td colspan='4'>No saved item details</td></tr>"}</tbody></table><div class="total">Order total: ${money(order.total)}</div><p class="foot">Thank you for shopping with BIG ALIEN. Keep this receipt for your records.</p><script>window.onload=()=>window.print();<\/script></body></html>`);
+  popup.document.close();
+}
+
+async function reorderCustomerOrder(orderId) {
+  const items = customerOrderItemsCache[orderId] || [];
+  if (!items.length) return alert("The saved products for this order are unavailable, so it cannot be reordered from this record.");
+  let added = 0, unavailable = [];
+  for (const oldItem of items) {
+    const product = products.find(p => String(p.id) === String(oldItem.product_id));
+    if (!product || product.active === false || productStock(product) < 1) {
+      unavailable.push(oldItem.product_name || "A product");
+      continue;
+    }
+    const quantity = Math.max(1, Number(oldItem.quantity) || 1);
+    const available = productStock(product);
+    if (quantity > available) {
+      unavailable.push(`${oldItem.product_name || product.name} (only ${available} available)`);
+      continue;
+    }
+    addCart(product, quantity, { size: oldItem.size || "", color: oldItem.color || "" });
+    added++;
+  }
+  if (added) {
+    show("cartView");
+    renderCart();
+    if (unavailable.length) alert(`Some items were not added: ${unavailable.join(", ")}.`);
+  } else {
+    alert(`No items could be reordered. ${unavailable.join(", ")}`);
+  }
+}
+
 function applyOrderFilter(filter) {
   document.querySelectorAll("[data-order-filter]").forEach(b => b.classList.toggle("active", b.dataset.orderFilter === filter));
   document.querySelectorAll("#ordersList .orderCard").forEach(card => {
@@ -1476,6 +1531,16 @@ document.addEventListener("click", async (e) => {
   if (t.dataset.readNotification) {
     e.preventDefault();
     await markNotificationRead(t.dataset.readNotification);
+    return;
+  }
+  if (t.dataset.orderReceipt) {
+    e.preventDefault();
+    printCustomerOrderReceipt(t.dataset.orderReceipt);
+    return;
+  }
+  if (t.dataset.orderReorder) {
+    e.preventDefault();
+    await reorderCustomerOrder(t.dataset.orderReorder);
     return;
   }
   if (t.dataset.view === "home") {
