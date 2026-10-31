@@ -670,51 +670,168 @@ function renderAccountCustomerName() {
   el.textContent = fullName || emailName || "Welcome!";
 }
 
+function ensureRewardsDashboard() {
+  const existing = $("rewardsDashboard");
+  if (existing) return existing;
+
+  const balanceCard = document.querySelector("#rewardsView .rewardsBalanceCard");
+  if (!balanceCard) return null;
+
+  if (!$("rewardsDashboardStyles")) {
+    const style = document.createElement("style");
+    style.id = "rewardsDashboardStyles";
+    style.textContent = `
+      .rewardsDashboard{margin:20px 0 8px;display:grid;gap:12px}
+      .rewardsDashboardTitle{margin:0;font-size:19px;font-weight:800}
+      .rewardsStatGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+      .rewardsStatCard{min-width:0;padding:14px;border:1px solid var(--border,#dce4ef);border-radius:14px;background:var(--card,#fff);display:grid;gap:7px}
+      .rewardsStatCard small{color:var(--muted,#6b7280);font-size:12px;line-height:1.35}
+      .rewardsStatCard strong{font-size:clamp(18px,4.8vw,23px);line-height:1.2;overflow-wrap:anywhere}
+      .rewardsProgressCard{padding:16px;border:1px solid var(--border,#dce4ef);border-radius:14px;background:var(--card,#fff)}
+      .rewardsProgressHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+      .rewardsProgressHead b{font-size:15px}
+      .rewardsProgressHead strong{color:#075bea;white-space:nowrap}
+      .rewardsProgressTrack{height:10px;overflow:hidden;border-radius:999px;background:var(--bg,#eef2f7)}
+      .rewardsProgressFill{height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,#075bea,#2b83f6);transition:width .25s ease}
+      .rewardsProgressText{margin:9px 0 0;color:var(--muted,#6b7280);font-size:13px;line-height:1.5}
+      body.dark .rewardsStatCard,body.dark .rewardsProgressCard{background:var(--card,#172033);border-color:var(--border,#344258);color:var(--ink,#f1f5fb)}
+      body.dark .rewardsStatCard small,body.dark .rewardsProgressText{color:var(--muted,#bdc9da)}
+      @media(max-width:360px){.rewardsStatGrid{grid-template-columns:1fr}.rewardsStatCard{padding:12px}}
+    `;
+    document.head.appendChild(style);
+  }
+
+  const dashboard = document.createElement("section");
+  dashboard.id = "rewardsDashboard";
+  dashboard.className = "rewardsDashboard";
+  dashboard.setAttribute("aria-label", "Your loyalty overview");
+  dashboard.innerHTML = `
+    <h3 class="rewardsDashboardTitle">Your loyalty overview</h3>
+    <div class="rewardsStatGrid">
+      <article class="rewardsStatCard"><small>Total points earned</small><strong id="rewardsTotalEarned">—</strong></article>
+      <article class="rewardsStatCard"><small>Points redeemed</small><strong id="rewardsTotalRedeemed">—</strong></article>
+      <article class="rewardsStatCard"><small>Completed orders</small><strong id="rewardsCompletedOrders">—</strong></article>
+      <article class="rewardsStatCard"><small>Total spent on paid orders</small><strong id="rewardsTotalSpent">—</strong></article>
+    </div>
+    <div class="rewardsProgressCard">
+      <div class="rewardsProgressHead"><b>Progress to your next ₦50 reward</b><strong id="rewardsProgressPercent">0%</strong></div>
+      <div class="rewardsProgressTrack" role="progressbar" aria-label="Progress toward next reward" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="rewardsProgressBar"><div class="rewardsProgressFill" id="rewardsProgressFill"></div></div>
+      <p class="rewardsProgressText" id="rewardsProgressText">Earn 100 points to unlock your next ₦50 reward.</p>
+    </div>`;
+  balanceCard.insertAdjacentElement("afterend", dashboard);
+  return dashboard;
+}
+
 async function loadCustomerRewards() {
   const balanceEl = $("rewardsBalance");
   const historyEl = $("rewardsHistory");
   const noteEl = $("rewardsMessage");
   if (!sb || !balanceEl || !historyEl) return;
+
+  const dashboard = ensureRewardsDashboard();
+  const ruleNote = document.querySelector("#rewardsView .rewardsRule small");
+  if (ruleNote) ruleNote.textContent = "At checkout, select the option to use 100 points for ₦50 off. Your available points are shown above.";
+
   balanceEl.textContent = "Loading…";
   historyEl.innerHTML = '<p class="muted">Loading your rewards history…</p>';
   if (noteEl) noteEl.textContent = "";
+  ["rewardsTotalEarned", "rewardsTotalRedeemed", "rewardsCompletedOrders", "rewardsTotalSpent"].forEach((id) => {
+    if ($(id)) $(id).textContent = "Loading…";
+  });
+  if ($("rewardsProgressText")) $("rewardsProgressText").textContent = "Calculating your reward progress…";
 
-  // Read the currently authenticated user directly instead of relying only
-  // on the app's cached user variable when the rewards screen is opened.
+  // Resolve the current authenticated customer before requesting private records.
   const { data: authData, error: authError } = await sb.auth.getUser();
   const rewardsUser = authData?.user || user;
   if (authError || !rewardsUser?.id) {
     balanceEl.textContent = "Unavailable";
     historyEl.innerHTML = '<p class="muted">Please sign in again to view your rewards.</p>';
+    if (dashboard) dashboard.querySelectorAll(".rewardsStatCard strong").forEach((el) => { el.textContent = "—"; });
+    if ($("rewardsProgressText")) $("rewardsProgressText").textContent = "Sign in again to view your reward progress.";
     return;
   }
   user = rewardsUser;
 
-  const [{ data: account, error: accountError }, { data: transactions, error: historyError }] = await Promise.all([
+  // Orders are read only for the signed-in customer. Spending totals include
+  // confirmed paid orders; completed orders must also be marked delivered.
+  const [{ data: account, error: accountError }, { data: orders, error: ordersError }] = await Promise.all([
     sb.from("loyalty_accounts").select("points_balance").eq("user_id", rewardsUser.id).maybeSingle(),
-    sb.from("loyalty_transactions").select("id,transaction_type,points_delta,amount_ngn,description,created_at").eq("user_id", rewardsUser.id).order("created_at", { ascending: false }).limit(100)
+    sb.from("orders").select("id,total,payment_status,order_status,created_at").eq("user_id", rewardsUser.id).order("created_at", { ascending: false })
   ]);
+
+  // Fetch the full points ledger in pages so the earned/redeemed totals are
+  // not limited to only the latest 100 history rows.
+  const transactions = [];
+  let historyError = null;
+  const pageSize = 500;
+  const maxLedgerRows = 10000;
+  for (let offset = 0; offset < maxLedgerRows; offset += pageSize) {
+    const result = await sb.from("loyalty_transactions")
+      .select("id,transaction_type,points_delta,amount_ngn,description,created_at")
+      .eq("user_id", rewardsUser.id)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + pageSize - 1);
+    if (result.error) {
+      historyError = result.error;
+      break;
+    }
+    const batch = result.data || [];
+    transactions.push(...batch);
+    if (batch.length < pageSize) break;
+  }
+
   if (accountError || historyError) {
     balanceEl.textContent = "Unavailable";
     historyEl.innerHTML = `<p class="muted">Rewards are temporarily unavailable: ${esc((accountError || historyError).message)}</p>`;
+    if (dashboard) dashboard.querySelectorAll(".rewardsStatCard strong").forEach((el) => { el.textContent = "—"; });
+    if ($("rewardsProgressText")) $("rewardsProgressText").textContent = "Your reward progress is temporarily unavailable.";
     return;
   }
 
-  // The transaction ledger is the fallback source if the account balance
-  // has not refreshed yet. This also keeps redeemed/adjusted points accurate.
-  const ledgerBalance = (transactions || []).reduce((sum, tx) => sum + Number(tx.points_delta || 0), 0);
+  const ledgerBalance = transactions.reduce((sum, tx) => sum + Number(tx.points_delta || 0), 0);
   const storedBalance = Number(account?.points_balance || 0);
-  const points = Math.max(0, storedBalance || ledgerBalance);
+  const points = Math.max(0, account ? storedBalance : ledgerBalance);
   balanceEl.textContent = points.toLocaleString("en-NG");
-  const discount = Math.floor(points / 100) * 50;
+
+  const totalEarned = transactions.reduce((sum, tx) =>
+    sum + (tx.transaction_type === "earned" ? Math.max(0, Number(tx.points_delta || 0)) : 0), 0);
+  const totalRedeemed = transactions.reduce((sum, tx) =>
+    sum + (tx.transaction_type === "redeemed" ? Math.abs(Number(tx.points_delta || 0)) : 0), 0);
+
+  const customerOrders = orders || [];
+  const paidOrders = customerOrders.filter((order) => String(order.payment_status || "").toLowerCase() === "paid");
+  const completedOrders = paidOrders.filter((order) => String(order.order_status || "").toLowerCase() === "delivered");
+  const totalSpent = paidOrders.reduce((sum, order) => sum + Math.max(0, Number(order.total || 0)), 0);
+
+  if ($("rewardsTotalEarned")) $("rewardsTotalEarned").textContent = `${totalEarned.toLocaleString("en-NG")} pts`;
+  if ($("rewardsTotalRedeemed")) $("rewardsTotalRedeemed").textContent = `${totalRedeemed.toLocaleString("en-NG")} pts`;
+  if ($("rewardsCompletedOrders")) $("rewardsCompletedOrders").textContent = ordersError ? "—" : completedOrders.length.toLocaleString("en-NG");
+  if ($("rewardsTotalSpent")) $("rewardsTotalSpent").textContent = ordersError ? "—" : money(totalSpent);
+
+  const pointsProgress = points % 100;
+  const pointsToNextReward = pointsProgress === 0 ? 100 : 100 - pointsProgress;
+  const progressPercent = pointsProgress;
+  if ($("rewardsProgressPercent")) $("rewardsProgressPercent").textContent = `${progressPercent}%`;
+  if ($("rewardsProgressBar")) $("rewardsProgressBar").setAttribute("aria-valuenow", String(progressPercent));
+  if ($("rewardsProgressFill")) $("rewardsProgressFill").style.width = `${progressPercent}%`;
+  if ($("rewardsProgressText")) {
+    const redeemable = Math.floor(points / 100);
+    let progressText = `Earn ${pointsToNextReward} more point${pointsToNextReward === 1 ? "" : "s"} to reach your next ₦50 reward.`;
+    if (redeemable > 0) progressText = `You have ${redeemable} ₦50 reward${redeemable === 1 ? "" : "s"} available to redeem. Earn ${pointsToNextReward} more points to unlock the next one.`;
+    if (ordersError) progressText += " Order totals could not be loaded right now.";
+    $("rewardsProgressText").textContent = progressText;
+  }
+
+  const availableDiscount = Math.floor(points / 100) * 50;
   if (noteEl) noteEl.textContent = points >= 100
-    ? `You currently have enough points for up to ${money(discount)} in rewards discounts, subject to checkout eligibility.`
-    : `Earn ${100 - points} more points to reach your first ₦50 reward.`;
-  if (!transactions?.length) {
+    ? `Your points are worth up to ${money(availableDiscount)} in reward discounts. At checkout, redeem 100 points for ₦50 off an order.`
+    : `Earn ${100 - points} more points to unlock your first ₦50 reward.`;
+
+  if (!transactions.length) {
     historyEl.innerHTML = '<p class="muted">No rewards activity yet. Earn points when your orders are paid and delivered.</p>';
     return;
   }
-  historyEl.innerHTML = transactions.map(tx => {
+  historyEl.innerHTML = transactions.slice(0, 100).map((tx) => {
     const positive = Number(tx.points_delta) > 0;
     const label = tx.transaction_type === "earned" ? "Points earned" : tx.transaction_type === "redeemed" ? "Points redeemed" : "Points adjustment";
     return `<article class="rewardHistoryRow"><div><b>${label}</b><small>${esc(tx.description || "BIG ALIEN Rewards")}</small><small>${tx.created_at ? new Date(tx.created_at).toLocaleString() : ""}</small></div><strong class="${positive ? "rewardPositive" : "rewardNegative"}">${positive ? "+" : ""}${Number(tx.points_delta).toLocaleString("en-NG")} pts</strong></article>`;
