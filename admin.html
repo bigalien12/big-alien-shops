@@ -26,6 +26,13 @@
   <section id="denied" class="summary hidden"><h2>Admin access required</h2><p>This account is signed in but does not have the admin role. Ask the store owner to authorize it.</p><button class="secondary" id="deniedLoginAgain" type="button">Use another account</button></section>
   <section id="adminApp" class="hidden">
     <div class="adminTitle"><div><h1>👑 Owner Dashboard</h1><p>Manage products, orders, payments and shipment updates.</p></div><button class="primary" id="addProductBtn">➕ Add Product</button></div>
+    <section id="adminOverview" class="adminOverview" aria-label="Store overview">
+      <div class="adminStat"><span>Total orders</span><strong id="statTotalOrders">0</strong></div>
+      <div class="adminStat"><span>Paid revenue</span><strong id="statPaidRevenue">₦0</strong></div>
+      <div class="adminStat"><span>Pending payments</span><strong id="statPendingPayments">0</strong></div>
+      <div class="adminStat"><span>Active shipments</span><strong id="statActiveShipments">0</strong></div>
+    </section>
+
     <section id="adminMessagesPanel" class="notificationPanel hidden" aria-labelledby="adminMessagesTitle"><div class="notificationPanelHead"><h2 id="adminMessagesTitle">Admin Notifications</h2><button class="secondary" id="refreshAdminMessages" type="button">Refresh</button></div><div id="adminMessages"><p class="notificationEmpty">New orders and customer payment reports will appear here.</p></div></section>
     <div class="adminTabs"><button class="active" data-tab="products">Products</button><button data-tab="orders">Orders & Shipment</button></div>
     <section id="productsTab"><div id="adminProducts"></div></section>
@@ -37,7 +44,7 @@
 <footer>© Big Alien Venture 👽 · Admin dashboard</footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="admin.js?v=2"></script>
+<script src="admin.js?v=3"></script>
   <script type="module" src="notifications.js"></script>
 </body>
 </html>

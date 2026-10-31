@@ -162,6 +162,28 @@ async function loadProducts() {
     "adminProducts"
   ).innerHTML = `<div class="adminTable"><div class="adminRow"><b>Image</b><b>Product</b><b>Price</b><b>Stock</b><b>Status</b><b>Actions</b></div>${ rows || '<div class="summary">No products yet.</div>' }</div>`;
 }
+
+function renderAdminOverview(orders) {
+  const rows = Array.isArray(orders) ? orders : [];
+  const paidRevenue = rows.reduce((sum, order) => {
+    return String(order.payment_status || "").toLowerCase() === "paid"
+      ? sum + Number(order.total || 0)
+      : sum;
+  }, 0);
+  const pendingPayments = rows.filter(
+    (order) => String(order.payment_status || "").toLowerCase() === "pending"
+  ).length;
+  const activeShipments = rows.filter((order) => {
+    const status = String(order.order_status || "").toLowerCase();
+    return status !== "delivered" && status !== "cancelled";
+  }).length;
+
+  if ($("statTotalOrders")) $("statTotalOrders").textContent = rows.length.toLocaleString();
+  if ($("statPaidRevenue")) $("statPaidRevenue").textContent = money(paidRevenue);
+  if ($("statPendingPayments")) $("statPendingPayments").textContent = pendingPayments.toLocaleString();
+  if ($("statActiveShipments")) $("statActiveShipments").textContent = activeShipments.toLocaleString();
+}
+
 async function loadOrders() {
   const { data, error } = await sb
     .from("orders")
@@ -172,6 +194,7 @@ async function loadOrders() {
       '<div class="summary">' + esc(error.message) + "</div>";
     return;
   }
+  renderAdminOverview(data || []);
   $("adminOrders").innerHTML =
     (data || [])
       .map(

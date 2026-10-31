@@ -2,3 +2,39 @@
 
 /* Blue-button treatment to match the approved AbelShop mockup */
 .adminPage .primary,.adminPage .adminTabs button.active,.adminNav button,.adminRow button:not(.danger){background:#0866f5!important;color:#fff!important;border-color:#0866f5!important}.adminRow button.danger{background:#ef4444!important;color:#fff!important;border-color:#ef4444!important}.adminTabs button{background:#eef4ff!important;color:#075bea!important}.adminTabs button.active{background:#0866f5!important;color:#fff!important}
+
+
+/* Owner dashboard overview cards */
+.adminOverview{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;
+  margin:14px 0 20px;
+}
+.adminStat{
+  min-width:0;
+  background:#fff;
+  border:1px solid #e5eaf2;
+  border-radius:14px;
+  padding:15px 16px;
+  box-shadow:0 3px 12px #17255408;
+}
+.adminStat span{
+  display:block;
+  color:#687386;
+  font-size:13px;
+  margin-bottom:5px;
+}
+.adminStat strong{
+  display:block;
+  color:#14213d;
+  font-size:clamp(18px,2.5vw,24px);
+  line-height:1.25;
+  overflow-wrap:anywhere;
+}
+@media(max-width:700px){
+  .adminOverview{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  .adminStat{padding:12px}
+  .adminStat span{font-size:12px}
+  .adminStat strong{font-size:19px}
+}
