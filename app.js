@@ -655,21 +655,37 @@ async function loadCustomerRewards() {
   const balanceEl = $("rewardsBalance");
   const historyEl = $("rewardsHistory");
   const noteEl = $("rewardsMessage");
-  if (!user || !sb || !balanceEl || !historyEl) return;
+  if (!sb || !balanceEl || !historyEl) return;
   balanceEl.textContent = "Loading…";
   historyEl.innerHTML = '<p class="muted">Loading your rewards history…</p>';
   if (noteEl) noteEl.textContent = "";
 
+  // Read the currently authenticated user directly instead of relying only
+  // on the app's cached user variable when the rewards screen is opened.
+  const { data: authData, error: authError } = await sb.auth.getUser();
+  const rewardsUser = authData?.user || user;
+  if (authError || !rewardsUser?.id) {
+    balanceEl.textContent = "Unavailable";
+    historyEl.innerHTML = '<p class="muted">Please sign in again to view your rewards.</p>';
+    return;
+  }
+  user = rewardsUser;
+
   const [{ data: account, error: accountError }, { data: transactions, error: historyError }] = await Promise.all([
-    sb.from("loyalty_accounts").select("points_balance").eq("user_id", user.id).maybeSingle(),
-    sb.from("loyalty_transactions").select("id,transaction_type,points_delta,amount_ngn,description,created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(30)
+    sb.from("loyalty_accounts").select("points_balance").eq("user_id", rewardsUser.id).maybeSingle(),
+    sb.from("loyalty_transactions").select("id,transaction_type,points_delta,amount_ngn,description,created_at").eq("user_id", rewardsUser.id).order("created_at", { ascending: false }).limit(100)
   ]);
   if (accountError || historyError) {
     balanceEl.textContent = "Unavailable";
     historyEl.innerHTML = `<p class="muted">Rewards are temporarily unavailable: ${esc((accountError || historyError).message)}</p>`;
     return;
   }
-  const points = Number(account?.points_balance || 0);
+
+  // The transaction ledger is the fallback source if the account balance
+  // has not refreshed yet. This also keeps redeemed/adjusted points accurate.
+  const ledgerBalance = (transactions || []).reduce((sum, tx) => sum + Number(tx.points_delta || 0), 0);
+  const storedBalance = Number(account?.points_balance || 0);
+  const points = Math.max(0, storedBalance || ledgerBalance);
   balanceEl.textContent = points.toLocaleString("en-NG");
   const discount = Math.floor(points / 100) * 50;
   if (noteEl) noteEl.textContent = points >= 100
