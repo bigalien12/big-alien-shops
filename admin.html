@@ -27,10 +27,11 @@
   <section id="adminApp" class="hidden">
     <div class="adminTitle"><div><h1>👑 Owner Dashboard</h1><p>Manage products, orders, payments and shipment updates.</p></div><button class="primary" id="addProductBtn">➕ Add Product</button></div>
     <section id="adminMessagesPanel" class="notificationPanel hidden" aria-labelledby="adminMessagesTitle"><div class="notificationPanelHead"><h2 id="adminMessagesTitle">Admin Notifications</h2><button class="secondary" id="refreshAdminMessages" type="button">Refresh</button></div><div id="adminMessages"><p class="notificationEmpty">New orders and customer payment reports will appear here.</p></div></section>
-    <div class="adminTabs"><button class="active" data-tab="products">Products</button><button data-tab="orders">Orders & Shipment</button><button data-tab="reviews">Customer Reviews</button></div>
+    <div class="adminTabs"><button class="active" data-tab="products">Products</button><button data-tab="orders">Orders & Shipment</button><button data-tab="reviews">Customer Reviews</button><button data-tab="rewards">Customer Rewards</button></div>
     <section id="productsTab"><div id="adminProducts"></div></section>
     <section id="ordersTab" class="hidden"><div id="adminOrders"></div></section>
     <section id="reviewsTab" class="hidden"><div id="adminReviews"></div></section>
+    <section id="rewardsTab" class="hidden"><div id="adminRewards"></div></section>
   </section>
 </main>
 <div id="productModal" class="modal hidden"><div class="modalCard"><button class="close" data-close="productModal">×</button><h2 id="productModalTitle">Add Product</h2><form id="productForm"><input id="productId" type="hidden"><label>Product name<input id="productName" required></label><label>Category<input id="productCategory" value="Solar" required></label><label>Price (₦)<input id="productPrice" type="number" min="0" required></label><label>Stock<input id="productStock" type="number" min="0" required></label><label>Description<textarea id="productDescription" placeholder="Product details customers should see"></textarea></label><label>Available sizes (for clothes/shoes; separate with commas)<input id="productSizes" placeholder="S, M, L, XL, 40, 41, 42"></label><label>Available colors (separate with commas)<input id="productColors" placeholder="Black, White, Blue"></label><label>Product pictures (select multiple pictures for this one product)<input id="productImage" type="file" accept="image/*" multiple></label><p class="small muted">Select several photos for the same product. The first photo is the main photo.</p><div id="imagePreview"></div><p id="productMsg" class="small"></p><button class="primary" type="submit">Save Product</button></form></div></div>
@@ -38,7 +39,7 @@
 <footer>© Big Alien Venture 👽 · Admin dashboard</footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="admin.js?v=3"></script>
+<script src="admin.js?v=4"></script>
   <script type="module" src="notifications.js"></script>
 </body>
 </html>

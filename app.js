@@ -63,6 +63,7 @@ function show(id, remember = true) {
       "emailSettingsView",
       "passwordSettingsView",
       "reviewsView",
+      "rewardsView",
       "supportView",
       "deleteAccountView",
     ].includes(id)
@@ -84,6 +85,7 @@ function show(id, remember = true) {
     "emailSettingsView",
     "passwordSettingsView",
     "reviewsView",
+    "rewardsView",
     "supportView",
     "deleteAccountView",
     "adminView",
@@ -110,6 +112,7 @@ function show(id, remember = true) {
             "emailSettingsView",
             "passwordSettingsView",
             "reviewsView",
+            "rewardsView",
             "supportView",
             "deleteAccountView",
           ].includes(id) &&
@@ -646,6 +649,41 @@ function renderAccountCustomerName() {
   ).trim();
   const emailName = (user?.email || "").split("@")[0];
   el.textContent = fullName || emailName || "Welcome!";
+}
+
+async function loadCustomerRewards() {
+  const balanceEl = $("rewardsBalance");
+  const historyEl = $("rewardsHistory");
+  const noteEl = $("rewardsMessage");
+  if (!user || !sb || !balanceEl || !historyEl) return;
+  balanceEl.textContent = "Loading…";
+  historyEl.innerHTML = '<p class="muted">Loading your rewards history…</p>';
+  if (noteEl) noteEl.textContent = "";
+
+  const [{ data: account, error: accountError }, { data: transactions, error: historyError }] = await Promise.all([
+    sb.from("loyalty_accounts").select("points_balance").eq("user_id", user.id).maybeSingle(),
+    sb.from("loyalty_transactions").select("id,transaction_type,points_delta,amount_ngn,description,created_at").eq("user_id", user.id).order("created_at", { ascending: false }).limit(30)
+  ]);
+  if (accountError || historyError) {
+    balanceEl.textContent = "Unavailable";
+    historyEl.innerHTML = `<p class="muted">Rewards are temporarily unavailable: ${esc((accountError || historyError).message)}</p>`;
+    return;
+  }
+  const points = Number(account?.points_balance || 0);
+  balanceEl.textContent = points.toLocaleString("en-NG");
+  const discount = Math.floor(points / 100) * 50;
+  if (noteEl) noteEl.textContent = points >= 100
+    ? `You currently have enough points for up to ${money(discount)} in rewards discounts, subject to checkout eligibility.`
+    : `Earn ${100 - points} more points to reach your first ₦50 reward.`;
+  if (!transactions?.length) {
+    historyEl.innerHTML = '<p class="muted">No rewards activity yet. Earn points when your orders are paid and delivered.</p>';
+    return;
+  }
+  historyEl.innerHTML = transactions.map(tx => {
+    const positive = Number(tx.points_delta) > 0;
+    const label = tx.transaction_type === "earned" ? "Points earned" : tx.transaction_type === "redeemed" ? "Points redeemed" : "Points adjustment";
+    return `<article class="rewardHistoryRow"><div><b>${label}</b><small>${esc(tx.description || "BIG ALIEN Rewards")}</small><small>${tx.created_at ? new Date(tx.created_at).toLocaleString() : ""}</small></div><strong class="${positive ? "rewardPositive" : "rewardNegative"}">${positive ? "+" : ""}${Number(tx.points_delta).toLocaleString("en-NG")} pts</strong></article>`;
+  }).join("");
 }
 
 async function loadProfile() {
@@ -1476,6 +1514,12 @@ function bindAccountAndBottomNavigation() {
         window.scrollTo({ top: 0, behavior: "auto" });
         return;
       }
+      if (action === "rewards") {
+        show("rewardsView");
+        loadCustomerRewards();
+        window.scrollTo({ top: 0, behavior: "auto" });
+        return;
+      }
       const viewId =
         action === "personal" ? "personalDetailsView"
           : action === "address" ? "deliveryAddressView"
@@ -1531,6 +1575,11 @@ document.addEventListener("click", async (e) => {
   if (t.dataset.readNotification) {
     e.preventDefault();
     await markNotificationRead(t.dataset.readNotification);
+    return;
+  }
+  if (t.id === "refreshRewardsBtn") {
+    e.preventDefault();
+    await loadCustomerRewards();
     return;
   }
   if (t.dataset.orderReceipt) {

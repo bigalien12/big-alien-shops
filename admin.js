@@ -78,6 +78,24 @@ async function moderateReview(id, status) {
   if (error) { alert("Could not update review: " + error.message); return; }
   await loadReviews();
 }
+async function loadRewardsAdmin() {
+  const box = $("adminRewards");
+  if (!box || !sb) return;
+  box.innerHTML = '<p class="muted">Loading customer rewards…</p>';
+  const { data: accounts, error } = await sb.from("loyalty_accounts")
+    .select("user_id,points_balance,updated_at")
+    .order("points_balance", { ascending: false }).limit(200);
+  if (error) { box.innerHTML = `<p class="muted">Could not load rewards: ${esc(error.message)}</p>`; return; }
+  if (!accounts?.length) { box.innerHTML = '<div class="summary">No customers have earned rewards points yet.</div>'; return; }
+  const ids = accounts.map(a => a.user_id);
+  const { data: profiles } = await sb.from("profiles").select("id,full_name,phone").in("id", ids);
+  const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+  box.innerHTML = accounts.map(a => {
+    const p = profileMap.get(a.user_id) || {};
+    return `<article class="summary adminRewardCard"><b>${esc(p.full_name || "Customer")}</b><p>${esc(p.phone || "No phone saved")}</p><strong>${Number(a.points_balance || 0).toLocaleString("en-NG")} points</strong><small class="muted">Updated ${a.updated_at ? new Date(a.updated_at).toLocaleString() : "—"}</small></article>`;
+  }).join("");
+}
+
 async function loadNotifications() {
   const box = $("adminMessages");
   if (!box || !sb || !adminUser) return;
@@ -324,6 +342,16 @@ async function manageOrder(id) {
       })
       .eq("id", id);
     if (error) return alert(error.message);
+    let rewardsNotice = "";
+    if ($("mPay").value === "paid" && $("mStatus").value === "delivered") {
+      const { data: awarded, error: rewardsError } = await sb.rpc("award_loyalty_points", { p_order_id: id });
+      if (rewardsError) {
+        console.error("BIG ALIEN rewards award error:", rewardsError);
+        rewardsNotice = " Order status saved, but rewards points could not be awarded: " + rewardsError.message;
+      } else if (Number(awarded) > 0) {
+        rewardsNotice = ` ${awarded} BIG ALIEN reward points awarded.`;
+      }
+    }
     if ($("mMessage").value.trim()) {
       const { error: e } = await sb
         .from("shipment_updates")
@@ -358,7 +386,7 @@ async function manageOrder(id) {
     }
     $("orderModal").classList.add("hidden");
     await loadOrders();
-    alert("Order updated. The customer will see the new shipment status.");
+    alert("Order updated. The customer will see the new shipment status." + rewardsNotice);
   };
   $("orderModal").classList.remove("hidden");
 }
@@ -375,7 +403,9 @@ document.addEventListener("click", async (e) => {
     $("productsTab").classList.toggle("hidden", t.dataset.tab !== "products");
     $("ordersTab").classList.toggle("hidden", t.dataset.tab !== "orders");
     $("reviewsTab").classList.toggle("hidden", t.dataset.tab !== "reviews");
+    $("rewardsTab").classList.toggle("hidden", t.dataset.tab !== "rewards");
     if (t.dataset.tab === "reviews") await loadReviews();
+    if (t.dataset.tab === "rewards") await loadRewardsAdmin();
   }
   if (t.dataset.reviewApprove) await moderateReview(t.dataset.reviewApprove, "approved");
   if (t.dataset.reviewReject) await moderateReview(t.dataset.reviewReject, "rejected");

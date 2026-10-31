@@ -194,35 +194,21 @@ body.dark .productReviews,body.dark .reviewCard,body.dark .adminReviewCard{backg
 body.dark .orderProducts{border-color:var(--line)}
 @media(max-width:420px){.orderActionRow{display:grid;grid-template-columns:1fr}.orderActionRow button{width:100%}.orderProductRow img,.orderProductPlaceholder{width:46px;height:46px;flex-basis:46px}}
 
-/* BIG ALIEN order thumbnail correction — applies to every order card */
-.orderCard .orderProducts .orderProductRow > img,
-.orderCard .orderProducts .orderProductRow > .orderProductPlaceholder {
-  display: block !important;
-  width: 48px !important;
-  height: 48px !important;
-  min-width: 48px !important;
-  min-height: 48px !important;
-  max-width: 48px !important;
-  max-height: 48px !important;
-  flex: 0 0 48px !important;
-  object-fit: contain !important;
-  overflow: hidden !important;
-  border-radius: 8px !important;
-}
-.orderCard .orderProducts .orderProductRow {
-  display: flex !important;
-  align-items: center !important;
-  gap: 10px !important;
-}
-@media (max-width: 560px) {
-  .orderCard .orderProducts .orderProductRow > img,
-  .orderCard .orderProducts .orderProductRow > .orderProductPlaceholder {
-    width: 42px !important;
-    height: 42px !important;
-    min-width: 42px !important;
-    min-height: 42px !important;
-    max-width: 42px !important;
-    max-height: 42px !important;
-    flex-basis: 42px !important;
-  }
-}
+
+/* BIG ALIEN Rewards */
+.rewardsPanel { max-width: 760px; }
+.rewardsBalanceCard { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; margin:18px 0; padding:26px 18px; border-radius:18px; background:linear-gradient(135deg,#075bea,#2b83f6); color:#fff; text-align:center; }
+.rewardsBalanceCard span { font-weight:700; }
+.rewardsBalanceCard strong { font-size:clamp(38px,10vw,54px); line-height:1.1; }
+.rewardsBalanceCard small { opacity:.9; }
+.rewardsRule { padding:16px; border:1px solid var(--border,#dce4ef); border-radius:14px; background:var(--card,#fff); }
+.rewardsRule p { margin:7px 0; }
+.rewardsRule small { color:var(--muted,#6b7280); }
+.rewardsHistoryHead { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:22px; }
+.rewardsHistoryHead h3 { margin:0; }
+.rewardHistoryRow { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 2px; border-bottom:1px solid var(--border,#e2e8f0); }
+.rewardHistoryRow div { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.rewardHistoryRow small { color:var(--muted,#6b7280); overflow-wrap:anywhere; }
+.rewardHistoryRow strong { white-space:nowrap; }
+.rewardPositive { color:#168447; }
+.rewardNegative { color:#c0392b; }

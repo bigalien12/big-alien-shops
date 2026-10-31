@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#075bea">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Big Alien Venture">
-  <link rel="stylesheet" href="styles.css?v=10">
+  <link rel="stylesheet" href="styles.css">
   <style>
     .passwordField{display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box}
     .passwordField input{flex:1;min-width:0}
@@ -164,6 +164,7 @@
     <div class="accountMenu">
       <button class="accountMenuRow" type="button" data-account-action="support"><span class="accountMenuIcon">ⓘ</span><span><b>Help &amp; Support</b><small>Call or WhatsApp customer service</small></span><span class="chevron">›</span></button>
       <button class="accountMenuRow" type="button" data-account-action="orders"><span class="accountMenuIcon">▣</span><span><b>Orders</b><small>Purchases and delivery status</small></span><span class="chevron">›</span></button>
+      <button class="accountMenuRow" type="button" data-account-action="rewards"><span class="accountMenuIcon">🎁</span><span><b>BIG ALIEN Rewards</b><small>Points balance and rewards history</small></span><span class="chevron">›</span></button>
       <button class="accountMenuRow" type="button" data-account-action="inbox"><span class="accountMenuIcon">✉</span><span><b>Customer Inbox</b><small>Messages and shipment notifications</small></span><span class="chevron">›</span></button>
       <button class="accountMenuRow" type="button" data-account-action="reviews"><span class="accountMenuIcon">☆</span><span><b>Ratings &amp; Reviews</b><small>Share feedback about your shopping</small></span><span class="chevron">›</span></button>
       <button class="accountMenuRow" type="button" data-account-action="management"><span class="accountMenuIcon">▤</span><span><b>Account Management</b><small>Profile photo, name and phone number</small></span><span class="chevron">›</span></button>
@@ -230,6 +231,19 @@
       <button class="primary" type="submit">Update Password</button>
       <div id="passwordChangeMsg" class="msg" aria-live="polite"></div>
     </form></section></section>
+  <section id="rewardsView" class="accountSubscreen hidden">
+    <button class="secondary accountBackBtn" type="button" data-account-back>← Back to My Account</button>
+    <section class="checkout accountPanel rewardsPanel">
+      <h2>🎁 BIG ALIEN Rewards</h2>
+      <p class="muted">Earn 1 point for every ₦1,000 spent on an order after it is paid and delivered.</p>
+      <div class="rewardsBalanceCard"><span>Your points balance</span><strong id="rewardsBalance">0</strong><small>points</small></div>
+      <div class="rewardsRule"><b>Redeem your points</b><p>100 points = ₦50 discount. Minimum redemption is 100 points.</p><small>Rewards discounts will become available at checkout in the next rewards step.</small></div>
+      <p id="rewardsMessage" class="small muted" aria-live="polite"></p>
+      <div class="rewardsHistoryHead"><h3>Rewards history</h3><button class="secondary" type="button" id="refreshRewardsBtn">Refresh</button></div>
+      <div id="rewardsHistory"><p class="muted">Your points activity will appear here.</p></div>
+    </section>
+  </section>
+
   <section id="customerInboxView" class="accountSubscreen hidden">
     <button class="secondary accountBackBtn" type="button" data-account-back>← Back to My Account</button>
     <section class="notificationPanel customerInboxPanel" aria-labelledby="customerInboxTitle">
@@ -340,7 +354,7 @@
 <footer>© Big Alien Venture 👽 · Customer service 07025136166</footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="app.js?v=11"></script>
+<script src="app.js?v=12"></script>
 <script>
   document.querySelectorAll('.passwordToggle[data-password-target]').forEach(function(button){
     button.addEventListener('click', function(){
