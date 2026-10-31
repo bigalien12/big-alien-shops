@@ -132,13 +132,6 @@
         <label>Full delivery address in Nigeria<textarea id="coAddress" rows="4" autocomplete="street-address" placeholder="House/building/flat number, street, area, LGA, city, state, Nigeria" required></textarea></label>
         <p class="small muted">Your saved address will fill in automatically. Edit it here if this order should go somewhere else. This change applies to this order only.</p>
       </fieldset>
-      <section id="checkoutRewards" class="checkoutRewardsPanel" aria-label="BIG ALIEN Rewards">
-        <h3>🎁 Use BIG ALIEN Rewards</h3>
-        <p>Your available balance: <b id="checkoutRewardsBalance">Loading…</b></p>
-        <label class="checkoutRewardChoice"><input id="applyRewardsPoints" type="checkbox" disabled> Use 100 points for ₦50 off</label>
-        <p id="checkoutRewardsNote" class="small muted" aria-live="polite">Checking your rewards balance…</p>
-        <div class="checkoutTotals"><div><span>Items subtotal</span><b id="checkoutSubtotal">₦0</b></div><div><span>Shipping</span><b id="checkoutShipping">₦3,000</b></div><div><span>Rewards discount</span><b id="checkoutRewardDiscount">₦0</b></div><div class="checkoutGrandTotal"><span>Amount to pay</span><b id="checkoutFinalTotal">₦0</b></div></div>
-      </section>
       <label>Payment method
         <select id="coPayment"><option value="bank_transfer">Bank transfer</option><option value="paystack">Paystack (card, bank and USSD)</option></select>
       </label>
@@ -295,12 +288,73 @@
       <p class="small muted">Your review will be sent to customer service for follow-up.</p>
     </section>
   </section>
+  <style>
+    /* BIG ALIEN Customer Support Centre */
+    #supportPanel{max-width:760px;margin:0 auto;padding:0;border:0;background:transparent;box-shadow:none}
+    .supportHero{background:linear-gradient(135deg,#075bea,#2c82f6);color:#fff;border-radius:20px;padding:22px;margin:8px 0 20px}
+    .supportHero h2{color:#fff;margin:8px 0;font-size:24px}.supportHero p{color:#eaf2ff;margin:0}
+    .supportHeroIcon{font-size:30px}.supportSectionTitle{font-size:18px;margin:22px 0 12px;color:var(--ink,#202738)}
+    .supportTopicGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .supportTopic{display:flex;gap:11px;align-items:flex-start;text-decoration:none;color:var(--ink,#202738);background:var(--card,#fff);border:1px solid var(--line,#dce5f5);border-radius:14px;padding:14px;min-width:0}
+    .supportTopicIcon{font-size:23px;line-height:1.2}.supportTopic b{display:block;margin-bottom:4px}.supportTopic small{display:block;color:var(--muted,#687386);line-height:1.4}
+    .supportFaq{background:var(--card,#fff);border:1px solid var(--line,#dce5f5);border-radius:13px;padding:0 14px;margin:9px 0}
+    .supportFaq summary{cursor:pointer;list-style:none;padding:15px 24px 15px 0;font-weight:700;position:relative;color:var(--ink,#202738)}
+    .supportFaq summary::-webkit-details-marker{display:none}.supportFaq summary:after{content:'＋';position:absolute;right:0;color:#075bea}.supportFaq[open] summary:after{content:'−'}
+    .supportFaq p{margin:0 0 15px;color:var(--muted,#687386);line-height:1.55}
+    .supportContact{background:#eaf8ef;border:1px solid #c8ead3;border-radius:16px;padding:17px;margin:22px 0 8px;color:#173d27}
+    .supportContact p{color:#315b40;margin:6px 0 14px}.supportContactActions{display:flex;gap:10px;flex-wrap:wrap}
+    .supportContactActions a{display:inline-flex;justify-content:center;align-items:center;gap:8px;text-decoration:none;border-radius:10px;padding:12px 16px;font-weight:750}
+    .supportWhatsapp{background:#168447;color:#fff}.supportCall{background:#fff;color:#1769d2;border:1px solid #cbdcf2}
+    .supportNote{font-size:13px;color:var(--muted,#687386);line-height:1.5;margin-top:14px}
+    body.dark .supportHero{background:linear-gradient(135deg,#0848b8,#1769d2)}
+    body.dark .supportTopic,body.dark .supportFaq{background:#172033;border-color:#344057;color:#f1f5fb}
+    body.dark .supportSectionTitle,body.dark .supportFaq summary{color:#f1f5fb}
+    body.dark .supportTopic small,body.dark .supportFaq p,body.dark .supportNote{color:#bdc9da}
+    body.dark .supportContact{background:#142c20;border-color:#28563a;color:#e8fff0}
+    body.dark .supportContact p{color:#c6e8d0}.supportCall{color:#1769d2}
+    @media(max-width:420px){.supportTopicGrid{grid-template-columns:1fr}.supportHero{padding:18px}}
+  </style>
   <section id="supportView" class="accountSubscreen hidden">
     <button class="secondary accountBackBtn" type="button" data-account-back>← Back to My Account</button>
     <section id="supportPanel" class="checkout accountPanel">
-      <h3>Help &amp; Support</h3><p>Need help with an order or payment?</p>
-      <p><a href="tel:+2347025136166">Call 07025136166</a></p>
-      <p><a href="https://wa.me/2347025136166" target="_blank" rel="noopener">Chat with us on WhatsApp</a></p>
+      <div class="supportHero">
+        <div class="supportHeroIcon" aria-hidden="true">🎧</div>
+        <h2>How can we help you?</h2>
+        <p>Welcome to BIG ALIEN Customer Support. Choose a topic below or contact our team directly.</p>
+      </div>
+
+      <h3 class="supportSectionTitle">What do you need help with?</h3>
+      <div class="supportTopicGrid">
+        <a class="supportTopic" href="https://wa.me/2347025136166?text=Hello%20BIG%20ALIEN%20Support%2C%20I%20need%20help%20with%20an%20order.%20My%20order%20ID%20is%3A%20" target="_blank" rel="noopener">
+          <span class="supportTopicIcon" aria-hidden="true">📦</span><span><b>Order problems</b><small>Missing items, order changes or complaints</small></span>
+        </a>
+        <a class="supportTopic" href="https://wa.me/2347025136166?text=Hello%20BIG%20ALIEN%20Support%2C%20I%20need%20help%20with%20delivery%20or%20order%20tracking.%20My%20order%20ID%20is%3A%20" target="_blank" rel="noopener">
+          <span class="supportTopicIcon" aria-hidden="true">🚚</span><span><b>Delivery help</b><small>Shipping progress and tracking updates</small></span>
+        </a>
+        <a class="supportTopic" href="https://wa.me/2347025136166?text=Hello%20BIG%20ALIEN%20Support%2C%20I%20want%20to%20ask%20about%20a%20return%20or%20refund.%20My%20order%20ID%20is%3A%20" target="_blank" rel="noopener">
+          <span class="supportTopicIcon" aria-hidden="true">↩️</span><span><b>Returns &amp; refunds</b><small>Ask the team about return or refund steps</small></span>
+        </a>
+        <a class="supportTopic" href="https://wa.me/2347025136166?text=Hello%20BIG%20ALIEN%20Support%2C%20I%20need%20help%20with%20a%20payment.%20My%20order%20ID%20is%3A%20" target="_blank" rel="noopener">
+          <span class="supportTopicIcon" aria-hidden="true">💳</span><span><b>Payment help</b><small>Transfer confirmation and payment questions</small></span>
+        </a>
+      </div>
+
+      <h3 class="supportSectionTitle">Frequently asked questions</h3>
+      <details class="supportFaq"><summary>How do I track my order?</summary><p>Open <b>Account → Orders</b> to view your order and any shipment updates added by BIG ALIEN. If you need more help, contact us with your order ID.</p></details>
+      <details class="supportFaq"><summary>How long does delivery take?</summary><p>Delivery timing depends on the destination and order. Check your order updates for the latest progress, or contact support with your order ID for an update.</p></details>
+      <details class="supportFaq"><summary>How can I request a return or refund?</summary><p>Contact BIG ALIEN Support with your order ID and explain the issue. Our team will review your request and confirm the available next steps.</p></details>
+      <details class="supportFaq"><summary>What should I do if my payment is not confirmed?</summary><p>Check your order status first. If it still shows unpaid after you have made a transfer, contact support and share your order ID and payment evidence. Please do not send payment details such as your PIN or password.</p></details>
+      <details class="supportFaq"><summary>How do I contact customer service?</summary><p>Use the WhatsApp or phone buttons below. Include your order ID when asking about an existing order so we can assist you faster.</p></details>
+
+      <div class="supportContact">
+        <div style="font-size:20px;font-weight:800">💬 Need more help?</div>
+        <p>Chat directly with BIG ALIEN Customer Service. We're ready to help with your shopping questions.</p>
+        <div class="supportContactActions">
+          <a class="supportWhatsapp" href="https://wa.me/2347025136166" target="_blank" rel="noopener">💬 Chat on WhatsApp</a>
+          <a class="supportCall" href="tel:+2347025136166">☎ Call 07025136166</a>
+        </div>
+      </div>
+      <p class="supportNote">For order-related enquiries, please include your order ID. Never share your account password, card PIN or one-time verification code with anyone.</p>
     </section>
   </section>
 
@@ -361,7 +415,7 @@
 <footer>© Big Alien Venture 👽 · Customer service 07025136166</footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="app.js?v=13"></script>
+<script src="app.js?v=12"></script>
 <script>
   document.querySelectorAll('.passwordToggle[data-password-target]').forEach(function(button){
     button.addEventListener('click', function(){
