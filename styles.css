@@ -193,3 +193,36 @@ body.dark .productReviews,body.dark .reviewCard,body.dark .adminReviewCard{backg
 .paymentStatusText{text-transform:capitalize}
 body.dark .orderProducts{border-color:var(--line)}
 @media(max-width:420px){.orderActionRow{display:grid;grid-template-columns:1fr}.orderActionRow button{width:100%}.orderProductRow img,.orderProductPlaceholder{width:46px;height:46px;flex-basis:46px}}
+
+/* BIG ALIEN order thumbnail correction — applies to every order card */
+.orderCard .orderProducts .orderProductRow > img,
+.orderCard .orderProducts .orderProductRow > .orderProductPlaceholder {
+  display: block !important;
+  width: 48px !important;
+  height: 48px !important;
+  min-width: 48px !important;
+  min-height: 48px !important;
+  max-width: 48px !important;
+  max-height: 48px !important;
+  flex: 0 0 48px !important;
+  object-fit: contain !important;
+  overflow: hidden !important;
+  border-radius: 8px !important;
+}
+.orderCard .orderProducts .orderProductRow {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+@media (max-width: 560px) {
+  .orderCard .orderProducts .orderProductRow > img,
+  .orderCard .orderProducts .orderProductRow > .orderProductPlaceholder {
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px !important;
+    min-height: 42px !important;
+    max-width: 42px !important;
+    max-height: 42px !important;
+    flex-basis: 42px !important;
+  }
+}
