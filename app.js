@@ -30,6 +30,8 @@ let currentView = null;
 const viewHistory = [];
 let customerOrdersCache = [];
 let customerOrderItemsCache = {};
+let checkoutRewardBalance = 0;
+let checkoutRewardLoading = false;
 
 function show(id, remember = true) {
   // A deliberate return to the marketplace starts a fresh customer navigation path.
@@ -122,6 +124,7 @@ function show(id, remember = true) {
       );
     });
   }
+  if (id === "checkoutView") loadCheckoutRewards();
 }
 function msg(id, t, ok = false) {
   $(id).textContent = t;
@@ -491,7 +494,8 @@ function checkoutReportKey() {
     .map((x) => `${x.id}:${x.qty}`)
     .sort()
     .join("|");
-  return user && cartKey ? `bav_payment_report_${user.id}_${cartKey}` : "";
+  const rewardKey = checkoutRewardChoice().points;
+  return user && cartKey ? `bav_payment_report_${user.id}_${cartKey}_rewards_${rewardKey}` : "";
 }
 function setupCheckoutPaymentGate() {
   const form = $("checkoutForm");
@@ -499,7 +503,7 @@ function setupCheckoutPaymentGate() {
   const panel = document.createElement("div");
   panel.id = "bavPaymentGate";
   panel.className = "bankBox";
-  panel.innerHTML = `<b>Bank transfer</b><p>Account name: Abel Philip<br>Account number: <span id="bavAccountNo">6714306196</span> <button class="secondary" type="button" id="bavCopyAccount">Copy</button><br>Bank: Moniepoint MFB</p><p>Transfer the checkout total, then tap <b>I Have Paid</b>. This reports your payment; the store must still confirm receipt.</p><button class="primary" type="button" id="bavReportPayment">I Have Paid</button><p id="bavPaymentMsg" class="msg" aria-live="polite">Place Order unlocks after you submit your payment report.</p>`;
+  panel.innerHTML = `<b>Bank transfer</b><p>Account name: Abel Philip<br>Account number: <span id="bavAccountNo">6714306196</span> <button class="secondary" type="button" id="bavCopyAccount">Copy</button><br>Bank: Moniepoint MFB</p><p>Transfer <b id="bavTransferAmount">the checkout total</b>, then tap <b>I Have Paid</b>. This reports your payment; the store must still confirm receipt.</p><button class="primary" type="button" id="bavReportPayment">I Have Paid</button><p id="bavPaymentMsg" class="msg" aria-live="polite">Place Order unlocks after you submit your payment report.</p>`;
   const submit = form.querySelector(
     'button[type="submit"],input[type="submit"]'
   );
@@ -536,6 +540,21 @@ function setupCheckoutPaymentGate() {
   };
   $("coPayment")?.addEventListener("change", syncPaymentChoice);
   syncPaymentChoice();
+  const rewardsCheckbox = $("applyRewardsPoints");
+  if (rewardsCheckbox && !rewardsCheckbox.dataset.bound) {
+    rewardsCheckbox.dataset.bound = "1";
+    rewardsCheckbox.addEventListener("change", () => {
+      renderCheckoutRewards();
+      const submit = $("bavPlaceOrder");
+      if ($("coPayment")?.value === "bank_transfer" && submit) {
+        const hasReport = Boolean(sessionStorage.getItem(checkoutReportKey()));
+        submit.hidden = !hasReport;
+        submit.disabled = !hasReport;
+        if (!hasReport && $("bavPaymentMsg")) $("bavPaymentMsg").textContent = "The amount changed. Please transfer the updated total and tap I Have Paid again.";
+      }
+    });
+  }
+  renderCheckoutRewards();
   const key = checkoutReportKey();
   if (key && sessionStorage.getItem(key) && submit) {
     submit.hidden = false;
@@ -569,7 +588,7 @@ async function reportCheckoutPayment() {
       "Payment report already saved. You can place the order now.";
     return;
   }
-  const amount = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const amount = checkoutAmounts().total;
   const reportButton = $("bavReportPayment");
   reportButton.disabled = true;
   status.textContent = "Sending your payment report…";
@@ -737,17 +756,76 @@ async function loadProfile() {
   const adminBtn = $("adminBtn");
   if (adminBtn) adminBtn.classList.toggle("hidden", data?.role !== "admin");
 }
+function checkoutRewardChoice() {
+  const enabled = Boolean($("applyRewardsPoints")?.checked);
+  const points = enabled ? 100 : 0;
+  const discount = enabled ? 50 : 0;
+  return { points, discount };
+}
+function checkoutAmounts() {
+  const subtotal = cart.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.qty || 0), 0);
+  const shippingFee = 3000;
+  const reward = checkoutRewardChoice();
+  const discount = Math.min(reward.discount, subtotal + shippingFee);
+  return { subtotal, shippingFee, discount, rewardPoints: discount ? reward.points : 0, total: Math.max(0, subtotal + shippingFee - discount) };
+}
+function renderCheckoutRewards() {
+  const box = $("checkoutRewards");
+  if (!box) return;
+  const checkbox = $("applyRewardsPoints");
+  const eligible = checkoutRewardBalance >= 100;
+  if (checkbox) {
+    checkbox.disabled = !eligible || checkoutRewardLoading;
+    if (!eligible) checkbox.checked = false;
+  }
+  const amounts = checkoutAmounts();
+  const balance = $("checkoutRewardsBalance");
+  if (balance) balance.textContent = checkoutRewardLoading ? "Loading…" : `${checkoutRewardBalance.toLocaleString("en-NG")} points`;
+  const note = $("checkoutRewardsNote");
+  if (note) note.textContent = eligible ? "Use 100 points to get ₦50 off this order." : `You need ${Math.max(0, 100 - checkoutRewardBalance)} more points to redeem your first ₦50 reward.`;
+  const discountLine = $("checkoutRewardDiscount");
+  if (discountLine) discountLine.textContent = `−${money(amounts.discount)}`;
+  const totalLine = $("checkoutFinalTotal");
+  if (totalLine) totalLine.textContent = money(amounts.total);
+  const subtotalLine = $("checkoutSubtotal");
+  if (subtotalLine) subtotalLine.textContent = money(amounts.subtotal);
+  const shippingLine = $("checkoutShipping");
+  if (shippingLine) shippingLine.textContent = money(amounts.shippingFee);
+  const reportAmount = $("bavTransferAmount");
+  if (reportAmount) reportAmount.textContent = money(amounts.total);
+}
+async function loadCheckoutRewards() {
+  const box = $("checkoutRewards");
+  if (!box || !sb || !user) return;
+  checkoutRewardLoading = true;
+  renderCheckoutRewards();
+  const { data, error } = await sb.from("loyalty_accounts").select("points_balance").eq("user_id", user.id).maybeSingle();
+  checkoutRewardLoading = false;
+  if (error) {
+    checkoutRewardBalance = 0;
+    const note = $("checkoutRewardsNote");
+    if (note) note.textContent = "Rewards are temporarily unavailable. You can continue checkout without a discount.";
+  } else {
+    checkoutRewardBalance = Math.max(0, Number(data?.points_balance || 0));
+  }
+  renderCheckoutRewards();
+}
+
 async function startPaystackCheckout() {
   if (!user) return msg("checkoutMsg", "Please sign in first.");
   if (!cart.length) return msg("checkoutMsg", "Cart is empty.");
   const button = $("bavPlaceOrder") || $("checkoutForm")?.querySelector('button[type="submit"]');
   if (button) { button.disabled = true; button.textContent = "Connecting to Paystack…"; }
   msg("checkoutMsg", "Preparing your secure Paystack payment…");
-  const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const shippingFee = 3000;
-  const total = subtotal + shippingFee;
+  const amounts = checkoutAmounts();
+  const { subtotal, shippingFee, total, discount, rewardPoints } = { ...amounts, discount: amounts.discount, rewardPoints: amounts.rewardPoints };
+  if (rewardPoints && checkoutRewardBalance < rewardPoints) {
+    msg("checkoutMsg", "Your rewards balance has changed. Refresh checkout and try again.");
+    if (button) { button.disabled = false; button.textContent = "Place Order"; }
+    return;
+  }
   const payload = {
-    user_id: user.id, subtotal, shipping_fee: shippingFee, total,
+    user_id: user.id, subtotal, shipping_fee: shippingFee, total, reward_points_used: rewardPoints, reward_discount: discount,
     payment_method: "paystack", payment_status: "pending", order_status: "processing",
     customer_name: $("coName").value.trim(), customer_phone: $("coPhone").value.trim(),
     delivery_address: $("coAddress").value.trim(),
@@ -822,14 +900,16 @@ async function submitOrder(e) {
   }
   if (paymentMethod !== "bank_transfer") return msg("checkoutMsg", "Please choose a valid payment method.");
 
-  const subtotal = cart.reduce((a, x) => a + x.price * x.qty, 0);
-  const shippingFee = 3000;
-  const total = subtotal + shippingFee;
+  const amounts = checkoutAmounts();
+  const { subtotal, shippingFee, total, discount, rewardPoints } = { ...amounts, discount: amounts.discount, rewardPoints: amounts.rewardPoints };
+  if (rewardPoints && checkoutRewardBalance < rewardPoints) return msg("checkoutMsg", "Your rewards balance has changed. Refresh checkout and try again.");
   const payload = {
     user_id: user.id,
     subtotal,
     shipping_fee: shippingFee,
     total,
+    reward_points_used: rewardPoints,
+    reward_discount: discount,
     payment_method: "bank_transfer",
     payment_status: "pending",
     order_status: "processing",

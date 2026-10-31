@@ -212,3 +212,9 @@ body.dark .orderProducts{border-color:var(--line)}
 .rewardHistoryRow strong { white-space:nowrap; }
 .rewardPositive { color:#168447; }
 .rewardNegative { color:#c0392b; }
+
+
+/* BIG ALIEN Rewards at checkout */
+.checkoutRewardsPanel{border:1px solid #cbdaf3;background:#f4f8ff;border-radius:14px;padding:14px;margin:14px 0;display:grid;gap:8px}
+.checkoutRewardsPanel h3{margin:0;color:#075bea}.checkoutRewardsPanel p{margin:0}.checkoutRewardChoice{display:flex;align-items:center;gap:10px;font-weight:700}.checkoutRewardChoice input{width:20px;height:20px;accent-color:#075bea}.checkoutTotals{display:grid;gap:8px;margin-top:6px}.checkoutTotals>div{display:flex;justify-content:space-between;gap:12px;padding-top:7px;border-top:1px solid #dce5f5}.checkoutTotals .checkoutGrandTotal{font-size:1.08rem;font-weight:800;color:#075bea}.checkoutGrandTotal b{font-size:1.2rem}
+body.dark .checkoutRewardsPanel{background:#172b46;border-color:#35577e;color:#f1f5fb}body.dark .checkoutRewardsPanel h3,body.dark .checkoutTotals .checkoutGrandTotal{color:#8bb8ff}body.dark .checkoutTotals>div{border-color:#40516b}
