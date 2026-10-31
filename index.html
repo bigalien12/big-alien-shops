@@ -22,6 +22,7 @@
     .accountDetailRow span{color:#65748b;flex:0 0 78px}.accountDetailRow b{text-align:right;overflow-wrap:anywhere;font-weight:600}
     .pageBackBtn{margin:10px 0}.emailOtpNotice{background:#edf4ff;border-radius:10px;padding:8px 12px;color:#174b9b}
     body.dark .accountDetailsCard{background:#1b2433;border-color:#35445b;color:#f3f6fc} body.dark .accountDetailRow{border-color:#35445b} body.dark .accountDetailRow span{color:#bdc9dc} body.dark .emailOtpNotice{background:#243752;color:#e5efff}
+    .deleteAccountRow{color:#b42318!important;border-top:1px solid #f1d4d1}.deleteAccountRow .accountMenuIcon,.deleteAccountRow b{color:#b42318!important}.deleteAccountPanel{border:1px solid #efc7c3;border-radius:14px;padding:16px;background:#fffafa}.deleteAccountPanel h2{color:#b42318}.deleteAccountPanel input{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:9px;box-sizing:border-box}.deleteAccountPanel .dangerButton{background:#b42318;color:#fff;border:0}.deleteAccountPanel .dangerButton:disabled{opacity:.55}.dark .deleteAccountPanel{background:#241b20;border-color:#74413f;color:#f8eaea}
   </style>
 
 <style>
@@ -172,6 +173,7 @@
       <button class="accountMenuRow" type="button" data-account-action="password"><span class="accountMenuIcon">🔒</span><span><b>Password</b><small>Change your account password</small></span><span class="chevron">›</span></button>
       <div class="accountMenuRow darkModeRow"><span class="accountMenuIcon">☾</span><span><b>Dark Screen Mode</b><small>Change the website appearance</small></span><label class="switch"><input id="darkModeToggle" type="checkbox" aria-label="Dark Screen Mode"><span class="switchSlider"></span></label></div>
       <button class="accountMenuRow logoutRow" type="button" id="logoutMenuBtn"><span class="accountMenuIcon">⇥</span><span><b>Logout</b><small>Sign out of your account</small></span><span class="chevron">›</span></button>
+      <button class="accountMenuRow deleteAccountRow" type="button" data-account-action="delete"><span class="accountMenuIcon">⚠</span><span><b>Delete Account</b><small>Permanently delete your customer account</small></span><span class="chevron">›</span></button>
     </div>
 <button
   type="button"
@@ -184,6 +186,21 @@
     
   </section>
 
+
+  <section id="deleteAccountView" class="accountSubscreen hidden">
+    <button class="secondary accountBackBtn" type="button" data-account-back>← Back to My Account</button>
+    <section class="checkout accountPanel deleteAccountPanel">
+      <h2>Delete Customer Account</h2>
+      <p><b>This action is permanent.</b> Your sign-in account and personal profile details will be deleted.</p>
+      <p>Your completed order records will be retained for store records, but your name, phone number, delivery address and order contact notes will be anonymised.</p>
+      <p><b>You cannot delete your account while an order is ongoing.</b> All orders must first be delivered, cancelled or returned.</p>
+      <p>The store owner/admin account cannot be deleted from this option.</p>
+      <label for="deleteAccountConfirmText">To confirm, type <b>DELETE</b> below.</label>
+      <input id="deleteAccountConfirmText" type="text" autocomplete="off" placeholder="Type DELETE" maxlength="6">
+      <button class="primary dangerButton" type="button" id="confirmDeleteAccountBtn">Permanently Delete My Account</button>
+      <div id="deleteAccountMsg" class="msg" aria-live="polite"></div>
+    </section>
+  </section>
 
   <section id="personalDetailsView" class="accountSubscreen hidden"><button class="secondary accountBackBtn" type="button" data-account-back>← Back to My Account</button><section class="checkout accountPanel"><h2>Personal Details</h2><div id="personalFormSlot"></div></section></section>
   <section id="deliveryAddressView" class="accountSubscreen hidden"><button class="secondary accountBackBtn" type="button" data-account-back>← Back to My Account</button><section class="checkout accountPanel"><h2>Delivery Address</h2><p class="muted">Enter your address in Nigeria.</p><form id="savedAddressForm" class="accountSettingsForm">

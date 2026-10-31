@@ -62,6 +62,7 @@ function show(id, remember = true) {
       "passwordSettingsView",
       "reviewsView",
       "supportView",
+      "deleteAccountView",
     ].includes(id)
   );
   [
@@ -82,6 +83,7 @@ function show(id, remember = true) {
     "passwordSettingsView",
     "reviewsView",
     "supportView",
+    "deleteAccountView",
     "adminView",
   ].forEach((viewId) => {
     const view = $(viewId);
@@ -107,6 +109,7 @@ function show(id, remember = true) {
             "passwordSettingsView",
             "reviewsView",
             "supportView",
+            "deleteAccountView",
           ].includes(id) &&
             button.id === "bottomProfileBtn") ||
           (id === "cartView" && button.id === "bottomCartBtn") ||
@@ -1241,6 +1244,8 @@ function bindAccountAndBottomNavigation() {
           ? "reviewsView"
           : action === "support"
           ? "supportView"
+          : action === "delete"
+          ? "deleteAccountView"
           : null;
       if (viewId) {
         show(viewId);
@@ -1954,4 +1959,52 @@ if (changePasswordForm) {
       msg.textContent = "Password update failed: " + error.message;
     }
   };
+}
+
+
+// Secure customer account deletion. The Edge Function rechecks role and orders server-side.
+const confirmDeleteAccountBtn = $("confirmDeleteAccountBtn");
+if (confirmDeleteAccountBtn) {
+  confirmDeleteAccountBtn.addEventListener("click", async () => {
+    const status = $("deleteAccountMsg");
+    const confirmation = $("deleteAccountConfirmText")?.value.trim() || "";
+    const setStatus = (message, ok = false) => {
+      if (status) { status.textContent = message; status.style.color = ok ? "#147a32" : "#b00020"; }
+    };
+    if (!sb) return setStatus("Account service is unavailable. Please refresh and try again.");
+    if (confirmation !== "DELETE") return setStatus("Type DELETE exactly to confirm.");
+    const { data: sessionData, error: sessionError } = await sb.auth.getSession();
+    if (sessionError || !sessionData?.session) return setStatus("Your session has expired. Please sign in again.");
+    const ok = window.confirm("Are you absolutely sure? Your customer account will be permanently deleted. Completed order records will be anonymised and retained.");
+    if (!ok) return;
+    confirmDeleteAccountBtn.disabled = true;
+    confirmDeleteAccountBtn.textContent = "Checking orders and deleting…";
+    setStatus("Checking your account and order status…");
+    try {
+      const { data, error } = await sb.functions.invoke("delete-customer-account", { body: { confirmation: "DELETE" } });
+      if (error) {
+        let detail = error.message || "The deletion request failed.";
+        try { const body = await error.context?.json?.(); if (body?.error) detail = body.error; } catch (_) {}
+        setStatus(detail);
+        return;
+      }
+      if (!data?.success) { setStatus(data?.error || "The account could not be deleted."); return; }
+      const oldUserId = user?.id;
+      if (oldUserId) {
+        localStorage.removeItem(`big_alien_profile_photo_${oldUserId}`);
+        localStorage.removeItem(`big_alien_address_${oldUserId}`);
+        localStorage.removeItem(`big_alien_wishlist_${oldUserId}`);
+      }
+      localStorage.removeItem("big_alien_cart");
+      await sb.auth.signOut();
+      user = null; profile = null; cart = [];
+      show("authView");
+      msg("authMsg", "Your customer account has been deleted successfully.", true);
+    } catch (error) {
+      setStatus("Deletion failed: " + (error?.message || String(error)));
+    } finally {
+      confirmDeleteAccountBtn.disabled = false;
+      confirmDeleteAccountBtn.textContent = "Permanently Delete My Account";
+    }
+  });
 }
