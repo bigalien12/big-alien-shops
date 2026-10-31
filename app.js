@@ -283,7 +283,15 @@ function openProduct(id) {
           <div><span>💬</span><p><b>Need help?</b><small><a href="https://wa.me/2347025136166" target="_blank" rel="noopener">Chat with customer service</a></small></p></div>
         </div>
       </div>
-    </div>`;
+    </div>
+    <section class="productReviews" id="productReviews" aria-live="polite">
+      <h2>Customer ratings & reviews</h2>
+      <div id="productReviewSummary" class="reviewSummary">Loading ratings…</div>
+      <div id="productReviewFormArea"></div>
+      <div id="productReviewList" class="reviewList"></div>
+    </section>`;
+
+  loadProductReviews(p.id);
 
   $("productBackBtn").onclick = () => {
     show("homeView");
@@ -347,6 +355,60 @@ function openProduct(id) {
     }
   };
 }
+async function loadProductReviews(productId) {
+  const summary = $("productReviewSummary"), formArea = $("productReviewFormArea"), list = $("productReviewList");
+  if (!summary || !formArea || !list || !sb) return;
+  summary.textContent = "Loading ratings…";
+  const { data: reviews, error } = await sb.from("product_reviews")
+    .select("id,rating,review_text,created_at")
+    .eq("product_id", productId).eq("status", "approved")
+    .order("created_at", { ascending: false }).limit(50);
+  if (error) {
+    summary.textContent = "Reviews are temporarily unavailable.";
+    console.error("Product reviews:", error);
+  } else {
+    const rows = reviews || [];
+    const average = rows.length ? rows.reduce((sum, r) => sum + Number(r.rating || 0), 0) / rows.length : 0;
+    summary.innerHTML = rows.length
+      ? `<strong>${average.toFixed(1)} / 5</strong> <span class="reviewStars">${"★".repeat(Math.round(average))}${"☆".repeat(5-Math.round(average))}</span> <span class="muted">${rows.length} approved review${rows.length===1?"":"s"}</span>`
+      : `<span class="muted">No approved reviews yet. Be the first verified customer to review this product.</span>`;
+    list.innerHTML = rows.length ? rows.map(r => `<article class="reviewCard"><div class="reviewCardHead"><b>Verified customer</b><span class="reviewStars">${"★".repeat(Number(r.rating))}${"☆".repeat(5-Number(r.rating))}</span></div><p>${esc(r.review_text)}</p><small class="muted">${new Date(r.created_at).toLocaleDateString()}</small></article>`).join("") : "";
+  }
+  if (!user) {
+    formArea.innerHTML = `<p class="muted">Sign in and complete a purchase to leave a review.</p>`;
+    return;
+  }
+  const { data: orders, error: ordersError } = await sb.from("orders").select("id")
+    .eq("user_id", user.id).eq("payment_status", "paid").eq("order_status", "delivered");
+  let eligibleOrderIds = [];
+  if (!ordersError && orders?.length) {
+    const ids = orders.map(o => o.id);
+    const { data: items, error: itemsError } = await sb.from("order_items").select("order_id")
+      .eq("product_id", productId).in("order_id", ids);
+    if (!itemsError) eligibleOrderIds = [...new Set((items || []).map(x => x.order_id))];
+  }
+  if (!eligibleOrderIds.length) {
+    formArea.innerHTML = `<p class="muted">Reviews are available after you have purchased this product and your order is marked paid and delivered.</p>`;
+    return;
+  }
+  formArea.innerHTML = `<form id="submitProductReview" class="reviewForm"><h3>Write a review</h3><label for="newReviewRating">Your rating</label><select id="newReviewRating" required><option value="">Choose stars</option><option value="5">★★★★★ — Excellent</option><option value="4">★★★★ — Very good</option><option value="3">★★★ — Good</option><option value="2">★★ — Fair</option><option value="1">★ — Poor</option></select><label for="newReviewText">Your experience</label><textarea id="newReviewText" minlength="3" maxlength="2000" rows="4" placeholder="Tell other customers about this product…" required></textarea><button class="primary" type="submit">Submit review</button><p id="newReviewMessage" class="muted" role="status">Your review will appear after owner approval.</p></form>`;
+  $("submitProductReview").onsubmit = async (e) => {
+    e.preventDefault();
+    const rating = Number($("newReviewRating").value), reviewText = $("newReviewText").value.trim();
+    if (!rating || reviewText.length < 3) return;
+    const button = e.currentTarget.querySelector("button[type=submit]"); button.disabled = true; button.textContent = "Submitting…";
+    const { error: insertError } = await sb.from("product_reviews").insert({
+      product_id: productId, order_id: eligibleOrderIds[0], user_id: user.id,
+      rating, review_text: reviewText, status: "pending"
+    });
+    if (insertError) {
+      $("newReviewMessage").textContent = insertError.code === "23505" ? "You have already reviewed this product from this order." : `Could not submit review: ${insertError.message}`;
+      button.disabled = false; button.textContent = "Submit review"; return;
+    }
+    formArea.innerHTML = `<p class="reviewSuccess">Thank you! Your review has been submitted and is waiting for owner approval.</p>`;
+  };
+}
+
 function productStock(p, fallback = 0) {
   const raw = p?.stock ?? fallback;
   const n = Number(raw);

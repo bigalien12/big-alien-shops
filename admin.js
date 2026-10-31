@@ -63,6 +63,21 @@ async function check() {
   await loadOrders();
   await loadNotifications();
 }
+async function loadReviews() {
+  const box = $("adminReviews"); if (!box || !sb) return;
+  box.innerHTML = '<p class="muted">Loading customer reviews…</p>';
+  const { data, error } = await sb.from("product_reviews")
+    .select("id,product_id,user_id,rating,review_text,status,created_at,products(name)")
+    .order("created_at", { ascending: false }).limit(100);
+  if (error) { box.innerHTML = `<p class="muted">Could not load reviews: ${esc(error.message)}</p>`; return; }
+  if (!data?.length) { box.innerHTML = '<div class="summary"><p>No customer reviews have been submitted yet.</p></div>'; return; }
+  box.innerHTML = data.map(r => `<article class="adminReviewCard"><div class="reviewCardHead"><b>${esc(r.products?.name || "Product")}</b><span class="reviewStars">${"★".repeat(Number(r.rating))}${"☆".repeat(5-Number(r.rating))}</span></div><p>${esc(r.review_text)}</p><small class="muted">${esc(r.status)} · ${new Date(r.created_at).toLocaleString()} · Customer ${esc(String(r.user_id).slice(0,8))}</small><div class="adminReviewActions">${r.status !== "approved" ? `<button class="approveReview" type="button" data-review-approve="${r.id}">Approve</button>` : ""}${r.status !== "rejected" ? `<button class="rejectReview" type="button" data-review-reject="${r.id}">Reject</button>` : ""}</div></article>`).join("");
+}
+async function moderateReview(id, status) {
+  const { error } = await sb.from("product_reviews").update({status}).eq("id", id);
+  if (error) { alert("Could not update review: " + error.message); return; }
+  await loadReviews();
+}
 async function loadNotifications() {
   const box = $("adminMessages");
   if (!box || !sb || !adminUser) return;
@@ -162,28 +177,6 @@ async function loadProducts() {
     "adminProducts"
   ).innerHTML = `<div class="adminTable"><div class="adminRow"><b>Image</b><b>Product</b><b>Price</b><b>Stock</b><b>Status</b><b>Actions</b></div>${ rows || '<div class="summary">No products yet.</div>' }</div>`;
 }
-
-function renderAdminOverview(orders) {
-  const rows = Array.isArray(orders) ? orders : [];
-  const paidRevenue = rows.reduce((sum, order) => {
-    return String(order.payment_status || "").toLowerCase() === "paid"
-      ? sum + Number(order.total || 0)
-      : sum;
-  }, 0);
-  const pendingPayments = rows.filter(
-    (order) => String(order.payment_status || "").toLowerCase() === "pending"
-  ).length;
-  const activeShipments = rows.filter((order) => {
-    const status = String(order.order_status || "").toLowerCase();
-    return status !== "delivered" && status !== "cancelled";
-  }).length;
-
-  if ($("statTotalOrders")) $("statTotalOrders").textContent = rows.length.toLocaleString();
-  if ($("statPaidRevenue")) $("statPaidRevenue").textContent = money(paidRevenue);
-  if ($("statPendingPayments")) $("statPendingPayments").textContent = pendingPayments.toLocaleString();
-  if ($("statActiveShipments")) $("statActiveShipments").textContent = activeShipments.toLocaleString();
-}
-
 async function loadOrders() {
   const { data, error } = await sb
     .from("orders")
@@ -194,7 +187,6 @@ async function loadOrders() {
       '<div class="summary">' + esc(error.message) + "</div>";
     return;
   }
-  renderAdminOverview(data || []);
   $("adminOrders").innerHTML =
     (data || [])
       .map(
@@ -382,7 +374,11 @@ document.addEventListener("click", async (e) => {
       .forEach((x) => x.classList.toggle("active", x === t));
     $("productsTab").classList.toggle("hidden", t.dataset.tab !== "products");
     $("ordersTab").classList.toggle("hidden", t.dataset.tab !== "orders");
+    $("reviewsTab").classList.toggle("hidden", t.dataset.tab !== "reviews");
+    if (t.dataset.tab === "reviews") await loadReviews();
   }
+  if (t.dataset.reviewApprove) await moderateReview(t.dataset.reviewApprove, "approved");
+  if (t.dataset.reviewReject) await moderateReview(t.dataset.reviewReject, "rejected");
   if (t.id === "addProductBtn") openProduct();
   if (t.dataset.edit) {
     const { data } = await sb
