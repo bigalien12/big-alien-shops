@@ -668,6 +668,24 @@ async function submitOrder(e) {
   );
   setTimeout(() => openOrders(), 600);
 }
+function orderTrackingStage(order, updates) {
+  const latest = updates?.[0] || null;
+  const current = `${order.order_status || ""} ${latest?.status || ""} ${latest?.message || ""}`.toLowerCase();
+  if (/cancel|refund|return/.test(current)) return { terminal: true, label: "Cancelled / Returned", index: -1 };
+  if (/delivered|successfully received|order complete/.test(current)) return { terminal: false, label: "Delivered", index: 4 };
+  if (/ready for pickup|available for pickup|at pickup point|arrived at pickup/.test(current)) return { terminal: false, label: "Ready for pickup", index: 3 };
+  if (/out for delivery|with rider|courier/.test(current)) return { terminal: false, label: "Out for delivery", index: 3 };
+  if (/in transit|shipped|dispatched|on the way|departed/.test(current)) return { terminal: false, label: "Shipped", index: 2 };
+  if (/processing|preparing|packed|confirmed|payment confirmed/.test(current)) return { terminal: false, label: "Processing", index: 1 };
+  return { terminal: false, label: order.order_status || "Order received", index: 0 };
+}
+
+function renderOrderTimeline(stage) {
+  if (stage.terminal) return `<div class="trackingTerminal"><b>⚠ ${esc(stage.label)}</b><p>Please contact customer service if you need help with this order.</p></div>`;
+  const steps = ["Order received", "Processing", "Shipped", "Out for delivery", "Delivered"];
+  return `<div class="trackingBlock"><div class="trackingHeading"><b>Delivery progress</b><span>${esc(stage.label)}</span></div><ol class="trackingTimeline">${steps.map((label, i) => `<li class="${i < stage.index ? "complete" : i === stage.index ? "current" : "pending"}"><span class="trackingDot">${i < stage.index ? "✓" : i + 1}</span><span class="trackingStepText"><b>${label}</b>${i === stage.index ? `<small>Current stage</small>` : ""}</span></li>`).join("")}</ol></div>`;
+}
+
 async function openOrders() {
   show("ordersView");
   await loadCustomerNotifications();
@@ -677,28 +695,28 @@ async function openOrders() {
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
   if (error)
-    return ($("ordersList").innerHTML = `<div class="summary">${esc( error.message )}</div>`);
+    return ($("ordersList").innerHTML = `<div class="summary">${esc(error.message)}</div>`);
   if (!data?.length)
-    return ($(
-      "ordersList"
-    ).innerHTML = `<div class="summary">No orders yet.</div>`);
+    return ($("ordersList").innerHTML = `<div class="summary">No orders yet.</div>`);
+
   let html = "";
   for (const o of data) {
-    let { data: ups } = await sb
+    const { data: ups, error: updatesError } = await sb
       .from("shipment_updates")
       .select("*")
       .eq("order_id", o.id)
       .order("created_at", { ascending: false });
-    const latest = (ups || [])[0];
-    const pickup =
-      /arrived|ready for pickup|available for pickup|at pickup point/i.test(
-        `${o.order_status || ""} ${latest?.status || ""} ${ latest?.message || "" }`
-      );
-    html += `<div class="orderCard"><b>Order ${o.id.slice( 0, 8 )}</b><p>Total: ${money(o.total)} · Payment: <span class="status">${esc( o.payment_status )}</span> · Status: <span class="status">${esc( o.order_status )}</span></p><p>Tracking: ${esc( o.tracking_number || "Not assigned" )}</p><p>Delivery: ${esc(o.delivery_address)}</p>${ pickup ? `<div class="pickupNotice"><b>📦 Your item may be ready for collection.</b><p>${esc( latest?.message || "Please check the latest shipment details before travelling to collect it." )}</p></div>` : "" }<h4>Shipment updates</h4>${ (ups || []) .map( (u) => `<div>📍 <b>${esc(u.status)}</b> — ${esc( u.message )} <span class="muted">${new Date( u.created_at ).toLocaleString()}</span></div>` ) .join("") || "<div class='muted'>No shipment updates yet.</div>" }</div>`;
+    const updates = updatesError ? [] : (ups || []);
+    const latest = updates[0] || null;
+    const stage = orderTrackingStage(o, updates);
+    const pickup = /ready for pickup|available for pickup|at pickup point|arrived at pickup/i.test(
+      `${o.order_status || ""} ${latest?.status || ""} ${latest?.message || ""}`
+    );
+    html += `<article class="orderCard"><div class="orderCardTop"><div><span class="muted">ORDER NUMBER</span><b class="orderNumber">${esc(o.id.slice(0, 8).toUpperCase())}</b></div><span class="orderCurrentBadge">${esc(stage.label)}</span></div><div class="orderMetaGrid"><div><small>Total</small><b>${money(o.total)}</b></div><div><small>Payment</small><b>${esc(o.payment_status || "Pending")}</b></div></div>${renderOrderTimeline(stage)}<div class="orderInfo"><p><b>Tracking number:</b> ${esc(o.tracking_number || "Not assigned yet")}</p><p><b>Delivery address:</b> ${esc(o.delivery_address || "Not available")}</p></div>${pickup ? `<div class="pickupNotice"><b>📦 Your item may be ready for collection.</b><p>${esc(latest?.message || "Please check the latest shipment details before travelling to collect it.")}</p></div>` : ""}<div class="shipmentHistory"><h4>Shipment updates</h4>${updates.map((u) => `<div class="shipmentUpdateRow"><span class="shipmentUpdatePin">📍</span><div><b>${esc(u.status || "Update")}</b><p>${esc(u.message || "")}</p><small>${u.created_at ? new Date(u.created_at).toLocaleString() : ""}</small></div></div>`).join("") || `<p class="muted">${updatesError ? "Shipment updates are temporarily unavailable." : "No shipment updates yet. We’ll show new updates here as the store processes your order."}</p>`}</div></article>`;
   }
   $("ordersList").innerHTML = html;
   applyOrderFilter("ongoing");
-} 
+}
 function applyOrderFilter(filter) {
   document.querySelectorAll("[data-order-filter]").forEach(b => b.classList.toggle("active", b.dataset.orderFilter === filter));
   document.querySelectorAll("#ordersList .orderCard").forEach(card => {
@@ -1092,7 +1110,7 @@ async function manageOrder(id) {
     .select("*")
     .eq("order_id", id)
     .order("created_at", { ascending: false });
-  $("orderModalBody").innerHTML = `<h2>Manage Order ${id.slice( 0, 8 )}</h2><p>${esc(o.customer_name)} · ${esc(o.customer_phone)}</p><p><b>Order contact email:</b> ${esc((o.notes || "").match(/Contact email for this order:\s*([\s\S]*?)\. Customer reported payment/i)?.[1] || "Not saved on this order")}</p><p>${esc( o.delivery_address )}</p><label>Payment status<select id="mPay"><option ${ o.payment_status === "pending" ? "selected" : "" }>pending</option><option ${ o.payment_status === "paid" ? "selected" : "" }>paid</option><option ${ o.payment_status === "failed" ? "selected" : "" }>failed</option><option ${ o.payment_status === "refunded" ? "selected" : "" }>refunded</option></select></label><label>Shipment status<select id="mStatus">${[ "processing", "confirmed", "shipped", "out_for_delivery", "ready_for_collection", "delivered", "cancelled", ] .map( (s) => `<option ${o.order_status === s ? "selected" : ""}>${s}</option>` ) .join( "" )}</select></label><label>Tracking number<input id="mTrack" value="${esc( o.tracking_number || "" )}"></label><label>Shipment message<textarea id="mMessage" placeholder="e.g. Package has left Abuja sorting centre"></textarea></label><label>Location<input id="mLocation" placeholder="e.g. Abuja"></label><button class="primary" id="saveOrder">Save Update</button><h3>History</h3>${( ups || [] ) .map( (u) => `<div>📍 <b>${esc(u.status)}</b> — ${esc(u.message)} (${new Date( u.created_at ).toLocaleString()})</div>` ) .join("")}`;
+  $("orderModalBody").innerHTML = `<h2>Manage Order ${id.slice( 0, 8 )}</h2><p>${esc(o.customer_name)} · ${esc(o.customer_phone)}</p><p><b>Order contact email:</b> ${esc((o.notes || "").match(/Contact email for this order:\s*([\s\S]*?)\. Customer reported payment/i)?.[1] || "Not saved on this order")}</p><p>${esc( o.delivery_address )}</p><label>Payment status<select id="mPay"><option ${ o.payment_status === "pending" ? "selected" : "" }>pending</option><option ${ o.payment_status === "paid" ? "selected" : "" }>paid</option><option ${ o.payment_status === "failed" ? "selected" : "" }>failed</option><option ${ o.payment_status === "refunded" ? "selected" : "" }>refunded</option></select></label><label>Shipment status<select id="mStatus">${[ "processing", "confirmed", "shipped", "out_for_delivery", "ready_for_collection", "delivered", "cancelled", "returned", ] .map( (s) => `<option ${o.order_status === s ? "selected" : ""}>${s}</option>` ) .join( "" )}</select></label><label>Tracking number<input id="mTrack" value="${esc( o.tracking_number || "" )}"></label><label>Shipment message<textarea id="mMessage" placeholder="e.g. Package has left Abuja sorting centre"></textarea></label><label>Location<input id="mLocation" placeholder="e.g. Abuja"></label><button class="primary" id="saveOrder">Save Update</button><h3>History</h3>${( ups || [] ) .map( (u) => `<div>📍 <b>${esc(u.status)}</b> — ${esc(u.message)} (${new Date( u.created_at ).toLocaleString()})</div>` ) .join("")}`;
   $("saveOrder").onclick = async () => {
     let pay = $("mPay").value,
       status = $("mStatus").value,
