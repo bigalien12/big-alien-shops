@@ -213,32 +213,139 @@ let activeProductImages = [];
 function openProduct(id) {
   const p = productById(id);
   if (!p) return;
+
   const images = productImages(p);
   activeProductImages = images;
   const sizes = Array.isArray(p.sizes) ? p.sizes : [];
   const colors = Array.isArray(p.colors) ? p.colors : [];
   const variants = needsVariants(p);
   const missingVariantSetup = variants && (!sizes.length || !colors.length);
+  const inStock = productStock(p) > 0;
+
   show("productView");
-  $("productView").innerHTML = `<div class="productDetail"><div class="productGallery"><img id="productMainImage" src="${esc(images[0])}" alt="${esc(p.name)}">${images.length > 1 ? `<div class="productImageThumbs">${images.map((url,i)=>`<button type="button" class="secondary" data-product-image="${i}" aria-label="View product photo ${i+1}"><img src="${esc(url)}" alt="Photo ${i+1}" style="width:64px;height:64px;object-fit:cover"></button>`).join("")}</div>` : ""}</div><div><div class="muted">${esc(p.category)}</div><h1>${esc(p.name)}</h1><div class="price">${money(p.price)}</div><p>${esc(p.description || "")}</p><div class="stockBadge ${p.stock > 0 ? "inStock" : "outStock"}">${p.stock > 0 ? "● In Stock" : "Out of Stock"}</div>${missingVariantSetup ? `<p class="muted">Size and color options are not yet configured for this item. Please contact the store before ordering.</p>` : ""}${variants && !missingVariantSetup ? `${sizes.length ? `<label>Choose size<select id="buySize" required><option value="">Select size</option>${sizes.map(s=>`<option value="${esc(s)}">${esc(s)}</option>`).join("")}</select></label>` : ""}${colors.length ? `<label>Choose color<select id="buyColor" required><option value="">Select color</option>${colors.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join("")}</select></label>` : ""}` : ""}<label>Quantity<input id="buyQty" type="number" min="1" max="${p.stock}" value="1"></label><button class="primary" id="addToCart" ${p.stock < 1 || missingVariantSetup ? "disabled" : ""}>🛒 Add to Cart</button><button class="secondary" id="buyNow" ${p.stock < 1 || missingVariantSetup ? "disabled" : ""}>Buy Now</button></div></div>`;
+  $("productView").innerHTML = `
+    <button class="secondary productBackButton" id="productBackBtn" type="button">← Back to products</button>
+    <div class="productDetail">
+      <div class="productGallery">
+        <div class="productMainImageWrap">
+          <img id="productMainImage" src="${esc(images[0])}" alt="${esc(p.name)}">
+          <span class="productPhotoCount">${images.length} photo${images.length === 1 ? "" : "s"}</span>
+        </div>
+        ${images.length > 1 ? `
+          <div class="productImageThumbs" aria-label="Product photos">
+            ${images.map((url, i) => `
+              <button type="button" class="productThumb ${i === 0 ? "active" : ""}" data-product-image="${i}" aria-label="View product photo ${i + 1}" aria-pressed="${i === 0}">
+                <img src="${esc(url)}" alt="${esc(p.name)} photo ${i + 1}">
+              </button>
+            `).join("")}
+          </div>` : ""}
+      </div>
+
+      <div class="productInfo">
+        <div class="productCategory">${esc(p.category || "Product")}</div>
+        <h1>${esc(p.name)}</h1>
+        <div class="productPrice">${money(p.price)}</div>
+        <div class="productAvailability ${inStock ? "available" : "unavailable"}">
+          <span class="availabilityDot"></span>${inStock ? "In Stock" : "Out of Stock"}
+        </div>
+        <div class="productDescription">
+          <h3>Product details</h3>
+          <p>${esc(p.description || "Contact us on WhatsApp if you need more information about this product.")}</p>
+        </div>
+
+        ${missingVariantSetup ? `
+          <div class="productSetupNotice">Size and color options are not yet configured for this item. Please contact the store before ordering.</div>
+        ` : ""}
+
+        ${variants && !missingVariantSetup ? `
+          <div class="productOptions">
+            ${sizes.length ? `<label>Choose size<select id="buySize" required><option value="">Select size</option>${sizes.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join("")}</select></label>` : ""}
+            ${colors.length ? `<label>Choose color<select id="buyColor" required><option value="">Select color</option>${colors.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("")}</select></label>` : ""}
+          </div>` : ""}
+
+        <div class="productQuantity">
+          <span>Quantity</span>
+          <div class="quantityStepper">
+            <button type="button" id="productQtyMinus" aria-label="Decrease quantity" ${!inStock ? "disabled" : ""}>−</button>
+            <input id="buyQty" type="number" min="1" max="${Math.max(1, productStock(p))}" value="1" inputmode="numeric" aria-label="Quantity">
+            <button type="button" id="productQtyPlus" aria-label="Increase quantity" ${!inStock ? "disabled" : ""}>+</button>
+          </div>
+        </div>
+
+        <div class="productActions">
+          <button class="primary" id="addToCart" ${!inStock || missingVariantSetup ? "disabled" : ""}>🛒 Add to Cart</button>
+          <button class="secondary productBuyNow" id="buyNow" ${!inStock || missingVariantSetup ? "disabled" : ""}>Buy Now</button>
+        </div>
+
+        <div class="productTrust">
+          <div><span>🚚</span><p><b>Reliable delivery</b><small>Delivery updates are available after ordering.</small></p></div>
+          <div><span>🔒</span><p><b>Secure checkout</b><small>Your account and order details stay protected.</small></p></div>
+          <div><span>💬</span><p><b>Need help?</b><small><a href="https://wa.me/2347025136166" target="_blank" rel="noopener">Chat with customer service</a></small></p></div>
+        </div>
+      </div>
+    </div>`;
+
+  $("productBackBtn").onclick = () => {
+    show("homeView");
+    renderProducts();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const qtyInput = $("buyQty");
+  $("productQtyMinus").onclick = () => {
+    qtyInput.value = Math.max(1, Number(qtyInput.value || 1) - 1);
+  };
+  $("productQtyPlus").onclick = () => {
+    const max = Number(qtyInput.max) || 1;
+    qtyInput.value = Math.min(max, Math.max(1, Number(qtyInput.value || 1) + 1));
+  };
+  qtyInput.addEventListener("change", () => {
+    const max = Number(qtyInput.max) || 1;
+    qtyInput.value = Math.min(max, Math.max(1, Math.floor(Number(qtyInput.value) || 1)));
+  });
+
   const selectedVariants = () => {
-    if (missingVariantSetup) { alert("The store owner must configure sizes and colors for this clothing/shoe item before it can be ordered."); return null; }
+    if (missingVariantSetup) {
+      alert("The store owner must configure sizes and colors for this clothing/shoe item before it can be ordered.");
+      return null;
+    }
     const size = $("buySize")?.value || "";
     const color = $("buyColor")?.value || "";
-    if (variants && sizes.length && !size) { alert("Please select a size first."); return null; }
-    if (variants && colors.length && !color) { alert("Please select a color first."); return null; }
-    return {size, color};
+    if (variants && sizes.length && !size) {
+      alert("Please select a size first.");
+      return null;
+    }
+    if (variants && colors.length && !color) {
+      alert("Please select a color first.");
+      return null;
+    }
+    return { size, color };
   };
+
   const addSelected = () => {
     const v = selectedVariants();
     if (!v) return false;
-    const q = Number($("buyQty").value);
-    if (!Number.isInteger(q) || q < 1) { alert("Please enter a valid quantity."); return false; }
+    const q = Number(qtyInput.value);
+    if (!Number.isInteger(q) || q < 1 || q > productStock(p)) {
+      alert("Please enter a valid quantity within the available stock.");
+      return false;
+    }
     addCart(p, q, v);
     return true;
   };
-  $("addToCart").onclick = () => { if (addSelected()) { show("cartView"); renderCart(); } };
-  $("buyNow").onclick = () => { if (addSelected()) { show("checkoutView"); prefillCheckout(); } };
+
+  $("addToCart").onclick = () => {
+    if (addSelected()) {
+      show("cartView");
+      renderCart();
+    }
+  };
+  $("buyNow").onclick = () => {
+    if (addSelected()) {
+      show("checkoutView");
+      prefillCheckout();
+    }
+  };
 }
 function productStock(p, fallback = 0) {
   const raw = p?.stock ?? fallback;
@@ -683,20 +790,7 @@ function orderTrackingStage(order, updates) {
 function renderOrderTimeline(stage) {
   if (stage.terminal) return `<div class="trackingTerminal"><b>⚠ ${esc(stage.label)}</b><p>Please contact customer service if you need help with this order.</p></div>`;
   const steps = ["Order received", "Processing", "Shipped", "Out for delivery", "Delivered"];
-  return `<div class="trackingBlock">
-    <div class="trackingHeading"><b>Delivery progress</b><span>${esc(stage.label)}</span></div>
-    <div class="trackingTimeline" role="list" aria-label="Delivery progress">
-      ${steps.map((label, i) => `<div class="trackingStep ${i < stage.index ? "complete" : i === stage.index ? "current" : "pending"}" role="listitem">
-        <span class="trackingDot">${i < stage.index ? "✓" : i + 1}</span>
-        <span class="trackingStepText"><b>${label}</b>${i === stage.index ? `<small>Current stage</small>` : ""}</span>
-      </div>`).join("")}
-    </div>
-  </div>`;
-}
-
-function formatShipmentStatus(status) {
-  const value = String(status || "Update").replace(/[_-]+/g, " ").trim();
-  return value.replace(/\\b\\w/g, (letter) => letter.toUpperCase());
+  return `<div class="trackingBlock"><div class="trackingHeading"><b>Delivery progress</b><span>${esc(stage.label)}</span></div><ol class="trackingTimeline">${steps.map((label, i) => `<li class="${i < stage.index ? "complete" : i === stage.index ? "current" : "pending"}"><span class="trackingDot">${i < stage.index ? "✓" : i + 1}</span><span class="trackingStepText"><b>${label}</b>${i === stage.index ? `<small>Current stage</small>` : ""}</span></li>`).join("")}</ol></div>`;
 }
 
 async function openOrders() {
@@ -725,35 +819,7 @@ async function openOrders() {
     const pickup = /ready for pickup|available for pickup|at pickup point|arrived at pickup/i.test(
       `${o.order_status || ""} ${latest?.status || ""} ${latest?.message || ""}`
     );
-    const seenStatuses = new Map();
-    const shipmentRows = updates.map((u) => {
-      const statusKey = String(u.status || "Update").toLowerCase().replace(/[_-]+/g, " ").trim();
-      const occurrence = (seenStatuses.get(statusKey) || 0) + 1;
-      seenStatuses.set(statusKey, occurrence);
-      const statusLabel = formatShipmentStatus(u.status);
-      const heading = occurrence > 1 ? `${statusLabel} · Update ${occurrence}` : statusLabel;
-      return `<div class="shipmentUpdateRow"><span class="shipmentUpdatePin" aria-hidden="true">📍</span><div class="shipmentUpdateContent"><b>${esc(heading)}</b><p>${esc(u.message || "")}</p><small>${u.created_at ? new Date(u.created_at).toLocaleString() : ""}</small></div></div>`;
-    }).join("");
-    html += `<article class="orderCard">
-      <div class="orderCardTop">
-        <div class="orderNumberGroup"><span class="muted">ORDER NUMBER</span><b class="orderNumber">${esc(o.id.slice(0, 8).toUpperCase())}</b></div>
-        <span class="orderCurrentBadge">${esc(stage.label)}</span>
-      </div>
-      <div class="orderMetaGrid">
-        <div><small>Total</small><b>${money(o.total)}</b></div>
-        <div><small>Payment</small><b>${esc(o.payment_status || "Pending")}</b></div>
-      </div>
-      ${renderOrderTimeline(stage)}
-      <div class="orderInfo">
-        <p><b>Tracking number:</b> <span>${esc(o.tracking_number || "Not assigned yet")}</span></p>
-        <p><b>Delivery address:</b> <span>${esc(o.delivery_address || "Not available")}</span></p>
-      </div>
-      ${pickup ? `<div class="pickupNotice"><b>📦 Your item may be ready for collection.</b><p>${esc(latest?.message || "Please check the latest shipment details before travelling to collect it.")}</p></div>` : ""}
-      <div class="shipmentHistory">
-        <h4>Shipment updates</h4>
-        ${shipmentRows || `<p class="muted">${updatesError ? "Shipment updates are temporarily unavailable." : "No shipment updates yet. We’ll show new updates here as the store processes your order."}</p>`}
-      </div>
-    </article>`;
+    html += `<article class="orderCard"><div class="orderCardTop"><div><span class="muted">ORDER NUMBER</span><b class="orderNumber">${esc(o.id.slice(0, 8).toUpperCase())}</b></div><span class="orderCurrentBadge">${esc(stage.label)}</span></div><div class="orderMetaGrid"><div><small>Total</small><b>${money(o.total)}</b></div><div><small>Payment</small><b>${esc(o.payment_status || "Pending")}</b></div></div>${renderOrderTimeline(stage)}<div class="orderInfo"><p><b>Tracking number:</b> ${esc(o.tracking_number || "Not assigned yet")}</p><p><b>Delivery address:</b> ${esc(o.delivery_address || "Not available")}</p></div>${pickup ? `<div class="pickupNotice"><b>📦 Your item may be ready for collection.</b><p>${esc(latest?.message || "Please check the latest shipment details before travelling to collect it.")}</p></div>` : ""}<div class="shipmentHistory"><h4>Shipment updates</h4>${updates.map((u) => `<div class="shipmentUpdateRow"><span class="shipmentUpdatePin">📍</span><div><b>${esc(u.status || "Update")}</b><p>${esc(u.message || "")}</p><small>${u.created_at ? new Date(u.created_at).toLocaleString() : ""}</small></div></div>`).join("") || `<p class="muted">${updatesError ? "Shipment updates are temporarily unavailable." : "No shipment updates yet. We’ll show new updates here as the store processes your order."}</p>`}</div></article>`;
   }
   $("ordersList").innerHTML = html;
   applyOrderFilter("ongoing");
@@ -1361,7 +1427,17 @@ document.addEventListener("click", async (e) => {
     renderProducts();
   }
   if (t.dataset.product) openProduct(t.dataset.product);
-  if (t.dataset.productImage !== undefined) { const main = $("productMainImage"); if (main && activeProductImages[Number(t.dataset.productImage)]) main.src = activeProductImages[Number(t.dataset.productImage)]; }
+  if (t.dataset.productImage !== undefined) {
+    const index = Number(t.dataset.productImage);
+    const main = $("productMainImage");
+    if (main && activeProductImages[index]) {
+      main.src = activeProductImages[index];
+      document.querySelectorAll(".productThumb").forEach((thumb, i) => {
+        thumb.classList.toggle("active", i === index);
+        thumb.setAttribute("aria-pressed", i === index ? "true" : "false");
+      });
+    }
+  }
   if (t.dataset.wishlistRemove) {
     toggleWishlist(t.dataset.wishlistRemove);
   }
