@@ -683,7 +683,20 @@ function orderTrackingStage(order, updates) {
 function renderOrderTimeline(stage) {
   if (stage.terminal) return `<div class="trackingTerminal"><b>⚠ ${esc(stage.label)}</b><p>Please contact customer service if you need help with this order.</p></div>`;
   const steps = ["Order received", "Processing", "Shipped", "Out for delivery", "Delivered"];
-  return `<div class="trackingBlock"><div class="trackingHeading"><b>Delivery progress</b><span>${esc(stage.label)}</span></div><ol class="trackingTimeline">${steps.map((label, i) => `<li class="${i < stage.index ? "complete" : i === stage.index ? "current" : "pending"}"><span class="trackingDot">${i < stage.index ? "✓" : i + 1}</span><span class="trackingStepText"><b>${label}</b>${i === stage.index ? `<small>Current stage</small>` : ""}</span></li>`).join("")}</ol></div>`;
+  return `<div class="trackingBlock">
+    <div class="trackingHeading"><b>Delivery progress</b><span>${esc(stage.label)}</span></div>
+    <div class="trackingTimeline" role="list" aria-label="Delivery progress">
+      ${steps.map((label, i) => `<div class="trackingStep ${i < stage.index ? "complete" : i === stage.index ? "current" : "pending"}" role="listitem">
+        <span class="trackingDot">${i < stage.index ? "✓" : i + 1}</span>
+        <span class="trackingStepText"><b>${label}</b>${i === stage.index ? `<small>Current stage</small>` : ""}</span>
+      </div>`).join("")}
+    </div>
+  </div>`;
+}
+
+function formatShipmentStatus(status) {
+  const value = String(status || "Update").replace(/[_-]+/g, " ").trim();
+  return value.replace(/\\b\\w/g, (letter) => letter.toUpperCase());
 }
 
 async function openOrders() {
@@ -712,7 +725,35 @@ async function openOrders() {
     const pickup = /ready for pickup|available for pickup|at pickup point|arrived at pickup/i.test(
       `${o.order_status || ""} ${latest?.status || ""} ${latest?.message || ""}`
     );
-    html += `<article class="orderCard"><div class="orderCardTop"><div><span class="muted">ORDER NUMBER</span><b class="orderNumber">${esc(o.id.slice(0, 8).toUpperCase())}</b></div><span class="orderCurrentBadge">${esc(stage.label)}</span></div><div class="orderMetaGrid"><div><small>Total</small><b>${money(o.total)}</b></div><div><small>Payment</small><b>${esc(o.payment_status || "Pending")}</b></div></div>${renderOrderTimeline(stage)}<div class="orderInfo"><p><b>Tracking number:</b> ${esc(o.tracking_number || "Not assigned yet")}</p><p><b>Delivery address:</b> ${esc(o.delivery_address || "Not available")}</p></div>${pickup ? `<div class="pickupNotice"><b>📦 Your item may be ready for collection.</b><p>${esc(latest?.message || "Please check the latest shipment details before travelling to collect it.")}</p></div>` : ""}<div class="shipmentHistory"><h4>Shipment updates</h4>${updates.map((u) => `<div class="shipmentUpdateRow"><span class="shipmentUpdatePin">📍</span><div><b>${esc(u.status || "Update")}</b><p>${esc(u.message || "")}</p><small>${u.created_at ? new Date(u.created_at).toLocaleString() : ""}</small></div></div>`).join("") || `<p class="muted">${updatesError ? "Shipment updates are temporarily unavailable." : "No shipment updates yet. We’ll show new updates here as the store processes your order."}</p>`}</div></article>`;
+    const seenStatuses = new Map();
+    const shipmentRows = updates.map((u) => {
+      const statusKey = String(u.status || "Update").toLowerCase().replace(/[_-]+/g, " ").trim();
+      const occurrence = (seenStatuses.get(statusKey) || 0) + 1;
+      seenStatuses.set(statusKey, occurrence);
+      const statusLabel = formatShipmentStatus(u.status);
+      const heading = occurrence > 1 ? `${statusLabel} · Update ${occurrence}` : statusLabel;
+      return `<div class="shipmentUpdateRow"><span class="shipmentUpdatePin" aria-hidden="true">📍</span><div class="shipmentUpdateContent"><b>${esc(heading)}</b><p>${esc(u.message || "")}</p><small>${u.created_at ? new Date(u.created_at).toLocaleString() : ""}</small></div></div>`;
+    }).join("");
+    html += `<article class="orderCard">
+      <div class="orderCardTop">
+        <div class="orderNumberGroup"><span class="muted">ORDER NUMBER</span><b class="orderNumber">${esc(o.id.slice(0, 8).toUpperCase())}</b></div>
+        <span class="orderCurrentBadge">${esc(stage.label)}</span>
+      </div>
+      <div class="orderMetaGrid">
+        <div><small>Total</small><b>${money(o.total)}</b></div>
+        <div><small>Payment</small><b>${esc(o.payment_status || "Pending")}</b></div>
+      </div>
+      ${renderOrderTimeline(stage)}
+      <div class="orderInfo">
+        <p><b>Tracking number:</b> <span>${esc(o.tracking_number || "Not assigned yet")}</span></p>
+        <p><b>Delivery address:</b> <span>${esc(o.delivery_address || "Not available")}</span></p>
+      </div>
+      ${pickup ? `<div class="pickupNotice"><b>📦 Your item may be ready for collection.</b><p>${esc(latest?.message || "Please check the latest shipment details before travelling to collect it.")}</p></div>` : ""}
+      <div class="shipmentHistory">
+        <h4>Shipment updates</h4>
+        ${shipmentRows || `<p class="muted">${updatesError ? "Shipment updates are temporarily unavailable." : "No shipment updates yet. We’ll show new updates here as the store processes your order."}</p>`}
+      </div>
+    </article>`;
   }
   $("ordersList").innerHTML = html;
   applyOrderFilter("ongoing");
