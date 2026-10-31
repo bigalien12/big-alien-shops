@@ -12,6 +12,10 @@
   <meta name="apple-mobile-web-app-title" content="Big Alien Venture">
   <link rel="stylesheet" href="styles.css">
   <style>
+    .passwordField{display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box}
+    .passwordField input{flex:1;min-width:0}
+    .passwordToggle{flex:0 0 auto;border:0;background:transparent;color:inherit;cursor:pointer;padding:8px 10px;font-size:20px;line-height:1;border-radius:8px}
+    .passwordToggle:focus-visible{outline:2px solid #075bea;outline-offset:2px}
     .accountDetailsCard{background:var(--card,#fff);border:1px solid #dce5f5;border-radius:16px;padding:14px;margin:12px 0 18px;box-shadow:0 3px 12px #0b3b7a0d}
     .accountAvatar{width:54px;height:54px;border-radius:50%;background:#eaf1ff;color:#075bea;display:grid;place-items:center;font-size:28px;margin-bottom:10px}
     .accountDetailRow{display:flex;justify-content:space-between;gap:14px;padding:11px 0;border-top:1px solid #e7edf7;font-size:14px}
@@ -58,14 +62,24 @@
       <div class="tabs"><button class="active" data-auth="login">Login</button><button data-auth="signup">Create Account</button></div>
       <form id="loginForm">
         <label>Email<input id="loginEmail" type="email" required></label>
-        <label>Password<input id="loginPassword" type="password" required></label>
+        <label>Password
+          <span class="passwordField">
+            <input id="loginPassword" type="password" autocomplete="current-password" required>
+            <button class="passwordToggle" type="button" data-password-target="loginPassword" aria-label="Show password" aria-pressed="false">👁</button>
+          </span>
+        </label>
         <button class="primary" type="submit">Login</button>
       </form>
       <form id="signupForm" class="hidden">
         <label>Full name<input id="signupName" required></label>
         <label>Phone<input id="signupPhone" required></label>
         <label>Email<input id="signupEmail" type="email" required></label>
-        <label>Password<input id="signupPassword" type="password" minlength="6" required></label>
+        <label>Password
+          <span class="passwordField">
+            <input id="signupPassword" type="password" autocomplete="new-password" minlength="6" required>
+            <button class="passwordToggle" type="button" data-password-target="signupPassword" aria-label="Show password" aria-pressed="false">👁</button>
+          </span>
+        </label>
         <button class="primary" type="submit">Create Account</button>
       </form>
       <div class="authDivider"><span>OR</span></div>
@@ -310,6 +324,19 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="app.js?v=7"></script>
+<script>
+  document.querySelectorAll('.passwordToggle[data-password-target]').forEach(function(button){
+    button.addEventListener('click', function(){
+      var input = document.getElementById(button.getAttribute('data-password-target'));
+      if (!input) return;
+      var show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      button.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+      button.setAttribute('aria-pressed', show ? 'true' : 'false');
+      button.textContent = show ? '🙈' : '👁';
+    });
+  });
+</script>
 <script type="module" src="notifications.js"></script>
 </body>
 </html>
