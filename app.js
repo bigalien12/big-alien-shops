@@ -43,6 +43,18 @@ function show(id, remember = true) {
   }
   currentView = id;
 
+  // Remember the last customer screen in this browser tab so returning from
+  // another app (or a tab reload) restores the same section.
+  try {
+    if (!["authView", "otpView"].includes(id)) {
+      sessionStorage.setItem("bav_last_view", id);
+      sessionStorage.setItem("bav_last_scroll", String(window.scrollY || 0));
+    } else {
+      sessionStorage.removeItem("bav_last_view");
+      sessionStorage.removeItem("bav_last_scroll");
+    }
+  } catch (_) {}
+
   // The search field and category strip should appear only on the marketplace.
   document.body.classList.toggle("marketplace-view", id === "homeView");
 
@@ -1531,6 +1543,27 @@ async function manageOrder(id) {
   };
   $("orderModal").classList.remove("hidden");
 }
+// Keep the current section and scroll position when the browser is backgrounded.
+window.addEventListener("pagehide", () => {
+  try {
+    if (currentView && !["authView", "otpView"].includes(currentView)) {
+      sessionStorage.setItem("bav_last_view", currentView);
+      sessionStorage.setItem("bav_last_scroll", String(window.scrollY || 0));
+    }
+  } catch (_) {}
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    try {
+      if (currentView && !["authView", "otpView"].includes(currentView)) {
+        sessionStorage.setItem("bav_last_view", currentView);
+        sessionStorage.setItem("bav_last_scroll", String(window.scrollY || 0));
+      }
+    } catch (_) {}
+  }
+});
+
 async function init() {
   if (!ready) {
     show("authView");
@@ -1545,9 +1578,39 @@ async function init() {
   user = data.session?.user || null;
   if (user) {
     await loadProfile();
-    show("homeView");
+    let savedView = "homeView";
+    let savedScroll = 0;
+    try {
+      const allowedViews = [
+        "homeView", "cartView", "checkoutView", "ordersView", "wishlistView",
+        "profileView", "customerInboxView", "accountManagementView",
+        "personalDetailsView", "deliveryAddressView", "emailSettingsView",
+        "passwordSettingsView", "reviewsView", "rewardsView", "supportView",
+        "deleteAccountView"
+      ];
+      const candidate = sessionStorage.getItem("bav_last_view");
+      if (allowedViews.includes(candidate)) savedView = candidate;
+      savedScroll = Math.max(0, Number(sessionStorage.getItem("bav_last_scroll") || 0));
+    } catch (_) {}
+    show(savedView, false);
     await loadProducts();
-  } else show("authView");
+
+    // Rebuild data-backed screens after restoring their visibility.
+    if (savedView === "cartView") renderCart();
+    if (savedView === "wishlistView") renderWishlist();
+    if (savedView === "profileView" || savedView === "accountManagementView") await loadProfile();
+    if (savedView === "ordersView") await openOrders();
+    if (savedView === "rewardsView") await loadCustomerRewards();
+    if (savedView !== "checkoutView") {
+      requestAnimationFrame(() => window.scrollTo({ top: savedScroll, behavior: "auto" }));
+    }
+  } else {
+    try {
+      sessionStorage.removeItem("bav_last_view");
+      sessionStorage.removeItem("bav_last_scroll");
+    } catch (_) {}
+    show("authView");
+  }
   sb.channel("bav-order-notifications")
     .on(
       "postgres_changes",
