@@ -1802,6 +1802,88 @@ function bindAccountAndBottomNavigation() {
       });
     });
   }
+
+// BIG ALIEN AI customer support chat. The AI key stays inside the Supabase Edge Function.
+const aiChatHistory = [];
+let aiChatBusy = false;
+
+function addAiChatBubble(message, who = "bot", extraClass = "") {
+  const area = $("aiChatMessages");
+  if (!area) return null;
+  const bubble = document.createElement("div");
+  bubble.className = `aiChatBubble ${who === "user" ? "aiUserBubble" : "aiBotBubble"} ${extraClass}`.trim();
+  bubble.textContent = message;
+  area.appendChild(bubble);
+  area.scrollTop = area.scrollHeight;
+  return bubble;
+}
+
+async function sendAiSupportMessage(rawMessage) {
+  const message = String(rawMessage || "").trim();
+  if (!message || aiChatBusy) return;
+  if (!sb || !user) {
+    addAiChatBubble("Please sign in to use BIG ALIEN AI Support. You can also contact us on WhatsApp.");
+    return;
+  }
+  if (/password|card pin|\\bpin\\b|\\botp\\b|one.?time.?password/i.test(message)) {
+    addAiChatBubble("For your security, please don't send passwords, card PINs or OTP codes here. I can still help with general shopping questions.");
+    return;
+  }
+
+  addAiChatBubble(message, "user");
+  aiChatHistory.push({ role: "user", content: message });
+  const input = $("aiChatInput");
+  const send = $("aiChatSend");
+  const typing = addAiChatBubble("AI assistant is typing…", "bot", "aiTyping");
+  aiChatBusy = true;
+  if (input) input.disabled = true;
+  if (send) { send.disabled = true; send.textContent = "…"; }
+
+  try {
+    const productContext = (products || []).filter(p => p.active !== false).slice(0, 80).map(p => ({
+      name: p.name, category: p.category, price: Number(p.price) || 0,
+      availability: productStock(p) > 0 ? "In Stock" : "Out of Stock",
+      description: String(p.description || "").slice(0, 240)
+    }));
+    const { data, error } = await sb.functions.invoke("ai-customer-support", {
+      body: {
+        messages: aiChatHistory.slice(-12),
+        store_context: {
+          store_name: "BIG ALIEN VENTURE",
+          currency: "NGN",
+          support_phone: "07025136166",
+          whatsapp: "https://wa.me/2347025136166",
+          products: productContext
+        }
+      }
+    });
+    if (error) throw error;
+    const answer = String(data?.reply || "").trim();
+    if (!answer) throw new Error("The AI assistant returned an empty reply.");
+    typing?.remove();
+    addAiChatBubble(answer);
+    aiChatHistory.push({ role: "assistant", content: answer });
+    if (aiChatHistory.length > 16) aiChatHistory.splice(0, aiChatHistory.length - 16);
+  } catch (error) {
+    console.error("BIG ALIEN AI support error:", error);
+    typing?.remove();
+    addAiChatBubble("I'm having trouble connecting right now. Please try again shortly or contact our team directly on WhatsApp.");
+  } finally {
+    aiChatBusy = false;
+    if (input) { input.disabled = false; input.value = ""; input.focus(); }
+    if (send) { send.disabled = false; send.textContent = "Send ➤"; }
+  }
+}
+
+const aiChatForm = $("aiChatForm");
+if (aiChatForm) aiChatForm.addEventListener("submit", event => {
+  event.preventDefault();
+  sendAiSupportMessage($("aiChatInput")?.value || "");
+});
+document.querySelectorAll("[data-ai-prompt]").forEach(button => {
+  button.addEventListener("click", () => sendAiSupportMessage(button.dataset.aiPrompt || ""));
+});
+
   document.querySelectorAll("[data-account-action]").forEach((button) => {
     button.addEventListener("click", (event) => {
       event.preventDefault();

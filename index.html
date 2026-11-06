@@ -313,6 +313,23 @@
     body.dark .supportContact{background:#142c20;border-color:#28563a;color:#e8fff0}
     body.dark .supportContact p{color:#c6e8d0}.supportCall{color:#1769d2}
     @media(max-width:420px){.supportTopicGrid{grid-template-columns:1fr}.supportHero{padding:18px}}
+    .aiSupportCard{background:var(--card,#fff);border:1px solid var(--line,#dce5f5);border-radius:18px;padding:16px;margin:18px 0 24px;box-shadow:0 5px 18px #10254b0c}
+    .aiSupportHead{display:flex;align-items:center;gap:11px}.aiSupportAvatar{width:44px;height:44px;border-radius:14px;background:#eaf2ff;display:grid;place-items:center;font-size:25px}
+    .aiSupportHead>div:nth-child(2){flex:1}.aiSupportHead b{display:block;color:var(--ink,#14213d)}.aiSupportHead small{display:block;color:var(--muted,#687386);font-size:12px}
+    .aiOnlineDot{display:inline-block;width:8px;height:8px;background:#16a34a;border-radius:50%;margin-right:5px}.aiSupportTag{font-size:10px;font-weight:850;letter-spacing:.07em;color:#075bea;background:#eaf2ff;border-radius:999px;padding:5px 8px}
+    .aiSupportIntro{font-size:13px;color:var(--muted,#687386);margin:12px 0}
+    .aiChatMessages{height:245px;overflow-y:auto;border:1px solid var(--line,#dce5f5);border-radius:13px;background:var(--bg,#f4f7fb);padding:12px;display:flex;flex-direction:column;gap:9px}
+    .aiChatBubble{max-width:88%;padding:10px 12px;border-radius:13px;font-size:14px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere}
+    .aiBotBubble{align-self:flex-start;background:var(--card,#fff);border:1px solid var(--line,#dce5f5);color:var(--ink,#14213d);border-bottom-left-radius:4px}
+    .aiUserBubble{align-self:flex-end;background:#075bea;color:#fff;border-bottom-right-radius:4px}
+    .aiTyping{color:var(--muted,#687386);font-style:italic}.aiQuickQuestions{display:flex;gap:7px;overflow-x:auto;padding:10px 0}
+    .aiQuickQuestions button{white-space:nowrap;font-size:12px;padding:8px 10px;border-radius:999px;color:#075bea;border-color:#cbdcfb;background:#f7faff}
+    .aiChatForm{display:flex;gap:8px}.aiChatForm input{min-width:0;flex:1}.aiChatForm button{background:#075bea;color:#fff;border-color:#075bea;white-space:nowrap}
+    .aiChatDisclaimer{font-size:11px;line-height:1.45;color:var(--muted,#687386);margin:9px 0 0}
+    body.dark .aiSupportCard{background:#172033;border-color:#344057}body.dark .aiSupportHead b{color:#f1f5fb}
+    body.dark .aiChatMessages{background:#0b1220;border-color:#344057}body.dark .aiBotBubble{background:#172033;color:#f1f5fb;border-color:#344057}
+    body.dark .aiSupportAvatar,body.dark .aiSupportTag{background:#243b5d;color:#dbeafe}
+    @media(max-width:420px){.aiSupportCard{padding:12px}.aiChatMessages{height:220px}.aiChatBubble{max-width:94%}}
   </style>
   <section id="supportView" class="accountSubscreen hidden">
     <button class="secondary accountBackBtn" type="button" data-account-back>← Back to My Account</button>
@@ -322,6 +339,27 @@
         <h2>How can we help you?</h2>
         <p>Welcome to BIG ALIEN Customer Support. Choose a topic below or contact our team directly.</p>
       </div>
+      <section class="aiSupportCard" aria-label="BIG ALIEN AI Support">
+        <div class="aiSupportHead">
+          <div class="aiSupportAvatar">👽</div>
+          <div><b>BIG ALIEN AI Assistant</b><small><span class="aiOnlineDot"></span> Online · Instant answers</small></div>
+          <span class="aiSupportTag">AI SUPPORT</span>
+        </div>
+        <p class="aiSupportIntro">Ask me about products, payments, delivery, orders or returns. I'm here to help.</p>
+        <div id="aiChatMessages" class="aiChatMessages" role="log" aria-live="polite" aria-relevant="additions">
+          <div class="aiChatBubble aiBotBubble">Hi! 👋 Welcome to BIG ALIEN VENTURE. What can I help you with today?</div>
+        </div>
+        <div class="aiQuickQuestions">
+          <button type="button" data-ai-prompt="How can I track my order?">Track my order</button>
+          <button type="button" data-ai-prompt="What payment methods do you accept?">Payment methods</button>
+          <button type="button" data-ai-prompt="How do delivery and returns work?">Delivery & returns</button>
+        </div>
+        <form id="aiChatForm" class="aiChatForm">
+          <input id="aiChatInput" type="text" maxlength="1000" placeholder="Type your message…" autocomplete="off" aria-label="Message the AI assistant" required>
+          <button id="aiChatSend" type="submit" aria-label="Send message">Send ➤</button>
+        </form>
+        <p class="aiChatDisclaimer">AI answers can make mistakes. For order-specific checks or urgent help, contact our team on WhatsApp. Never share passwords, PINs or OTP codes.</p>
+      </section>
 
       <h3 class="supportSectionTitle">What do you need help with?</h3>
       <div class="supportTopicGrid">
@@ -415,7 +453,7 @@
 <footer>© Big Alien Venture 👽 · Customer service 07025136166</footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="app.js?v=12"></script>
+<script src="app.js?v=13"></script>
 <script>
   document.querySelectorAll('.passwordToggle[data-password-target]').forEach(function(button){
     button.addEventListener('click', function(){
