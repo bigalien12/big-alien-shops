@@ -226,7 +226,7 @@ function renderProducts() {
     ? list
         .map(
           (p) =>
-            `<article class="card"><img src="${esc( imageOrFallback(p.image_url) )}" alt="${esc( p.name )}"><div class="cardBody"><div class="muted">${esc( p.category )}</div><h3>${esc(p.name)}</h3><div class="price">${money( p.price )}</div><div class="stockBadge ${p.stock > 0 ? "inStock" : "outStock"}">${p.stock > 0 ? "● In Stock" : "Out of Stock"}</div><button class="primary" data-product="${esc(p.id)}" ${ productStock(p) < 1 ? "disabled" : "" }>View / Buy</button><button class="secondary" type="button" data-wishlist-toggle="${esc(p.id)}">${getWishlist().includes(String(p.id)) ? "♥ Saved" : "♡ Save to Wishlist"}</button></div></article>`
+            `<article class="card"><button class="productImageOpen" type="button" data-product="${esc(p.id)}" aria-label="View ${esc(p.name)}" style="display:block;width:100%;padding:0;border:0;background:transparent;cursor:pointer;line-height:0"><img src="${esc( imageOrFallback(p.image_url) )}" alt="${esc( p.name )}" loading="lazy" decoding="async" style="display:block;width:100%;height:auto;cursor:pointer"></button><div class="cardBody"><div class="muted">${esc( p.category )}</div><h3>${esc(p.name)}</h3><div class="price">${money( p.price )}</div><div class="stockBadge ${p.stock > 0 ? "inStock" : "outStock"}">${p.stock > 0 ? "● In Stock" : "Out of Stock"}</div><button class="primary" data-product="${esc(p.id)}" ${ productStock(p) < 1 ? "disabled" : "" }>View / Buy</button><button class="secondary" type="button" data-wishlist-toggle="${esc(p.id)}">${getWishlist().includes(String(p.id)) ? "♥ Saved" : "♡ Save to Wishlist"}</button></div></article>`
         )
         .join("")
     : `<div class="summary"><h3>No products found</h3><p>Try another category or search.</p></div>`;
@@ -1151,47 +1151,75 @@ function renderOrderTimeline(stage) {
 
 async function openOrders() {
   show("ordersView");
-  await loadCustomerNotifications();
-  let { data, error } = await sb
+  const list = $("ordersList");
+  if (!sb || !user || !list) return;
+
+  // Render immediately; notifications must not delay the order screen.
+  list.innerHTML = `<div class="summary" role="status">Loading your orders…</div>`;
+  loadCustomerNotifications().catch((err) =>
+    console.warn("Customer notifications could not be refreshed:", err)
+  );
+
+  const { data: orders, error } = await sb
     .from("orders")
     .select("*")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false });
-  if (error)
-    return ($("ordersList").innerHTML = `<div class="summary">${esc(error.message)}</div>`);
-  if (!data?.length) {
+
+  if (error) {
+    list.innerHTML = `<div class="summary">${esc(error.message)}</div>`;
+    return;
+  }
+  if (!orders?.length) {
     customerOrdersCache = [];
     customerOrderItemsCache = {};
-    return ($("ordersList").innerHTML = `<div class="summary">No orders yet. Your purchases and delivery updates will appear here.</div>`);
+    list.innerHTML = `<div class="summary">No orders yet. Your purchases and delivery updates will appear here.</div>`;
+    return;
   }
 
-  customerOrdersCache = data;
+  customerOrdersCache = orders;
   customerOrderItemsCache = {};
-  let html = "";
-  for (const o of data) {
-    const { data: items, error: itemsError } = await sb
-      .from("order_items")
-      .select("id,product_id,product_name,product_price,quantity,image_url,size,color")
-      .eq("order_id", o.id);
-    customerOrderItemsCache[o.id] = itemsError ? [] : (items || []);
-    const { data: ups, error: updatesError } = await sb
-      .from("shipment_updates")
+  const orderIds = orders.map((order) => order.id);
+
+  // Fetch line items and shipment updates in parallel batches, not two
+  // sequential requests per order.
+  const [itemsResult, updatesResult] = await Promise.all([
+    sb.from("order_items")
+      .select("id,order_id,product_id,product_name,product_price,quantity,image_url,size,color")
+      .in("order_id", orderIds),
+    sb.from("shipment_updates")
       .select("*")
-      .eq("order_id", o.id)
-      .order("created_at", { ascending: false });
-    const updates = updatesError ? [] : (ups || []);
+      .in("order_id", orderIds)
+      .order("created_at", { ascending: false })
+  ]);
+
+  const itemsByOrder = {};
+  (itemsResult.data || []).forEach((item) => {
+    (itemsByOrder[item.order_id] ||= []).push(item);
+  });
+  const updatesByOrder = {};
+  (updatesResult.data || []).forEach((update) => {
+    (updatesByOrder[update.order_id] ||= []).push(update);
+  });
+
+  let html = "";
+  for (const o of orders) {
+    const itemsError = itemsResult.error;
+    const updatesError = updatesResult.error;
+    const orderItems = itemsByOrder[o.id] || [];
+    const updates = updatesByOrder[o.id] || [];
+    customerOrderItemsCache[o.id] = orderItems;
     const latest = updates[0] || null;
     const stage = orderTrackingStage(o, updates);
     const pickup = /ready for pickup|available for pickup|at pickup point|arrived at pickup/i.test(
       `${o.order_status || ""} ${latest?.status || ""} ${latest?.message || ""}`
     );
-    const orderItems = customerOrderItemsCache[o.id];
     const itemList = orderItems.length
-      ? `<div class="orderProducts"><h4>Items in this order</h4>${orderItems.map(item => `<div class="orderProductRow">${item.image_url ? `<img src="${esc(item.image_url)}" alt="${esc(item.product_name)}">` : `<span class="orderProductPlaceholder">🛍️</span>`}<div class="orderProductDetails"><b>${esc(item.product_name || "Product")}</b><small>Qty: ${Number(item.quantity) || 1}${item.size ? ` · Size: ${esc(item.size)}` : ""}${item.color ? ` · Colour: ${esc(item.color)}` : ""}</small></div><strong>${money((Number(item.product_price) || 0) * (Number(item.quantity) || 1))}</strong></div>`).join("")}</div>`
+      ? `<div class="orderProducts"><h4>Items in this order</h4>${orderItems.map(item => `<div class="orderProductRow">${item.image_url ? `<img src="${esc(item.image_url)}" alt="${esc(item.product_name)}" loading="lazy" decoding="async">` : `<span class="orderProductPlaceholder">🛍️</span>`}<div class="orderProductDetails"><b>${esc(item.product_name || "Product")}</b><small>Qty: ${Number(item.quantity) || 1}${item.size ? ` · Size: ${esc(item.size)}` : ""}${item.color ? ` · Colour: ${esc(item.color)}` : ""}</small></div><strong>${money((Number(item.product_price) || 0) * (Number(item.quantity) || 1))}</strong></div>`).join("")}</div>`
       : `<div class="orderProducts"><h4>Items in this order</h4><p class="muted">${itemsError ? "Order items are temporarily unavailable." : "No item details were saved for this order."}</p></div>`;
     html += `<article class="orderCard" data-customer-order="${esc(o.id)}"><div class="orderCardTop"><div><span class="muted">ORDER NUMBER</span><b class="orderNumber">${esc(o.id.slice(0, 8).toUpperCase())}</b><small class="orderPlacedDate">${o.created_at ? new Date(o.created_at).toLocaleString() : ""}</small></div><span class="orderCurrentBadge">${esc(stage.label)}</span></div><div class="orderMetaGrid"><div><small>Order total</small><b>${money(o.total)}</b></div><div><small>Payment status</small><b class="paymentStatusText">${esc(o.payment_status || "Pending")}</b></div></div>${itemList}${renderOrderTimeline(stage)}<div class="orderInfo"><p><b>Tracking number:</b> ${esc(o.tracking_number || "Not assigned yet")}</p><p><b>Delivery address:</b> ${esc(o.delivery_address || "Not available")}</p></div>${pickup ? `<div class="pickupNotice"><b>📦 Your item may be ready for collection.</b><p>${esc(latest?.message || "Please check the latest shipment details before travelling to collect it.")}</p></div>` : ""}<div class="shipmentHistory"><h4>Shipment updates</h4>${updates.map((u) => `<div class="shipmentUpdateRow"><span class="shipmentUpdatePin">📍</span><div><b>${esc(u.status || "Update")}</b><p>${esc(u.message || "")}</p><small>${u.created_at ? new Date(u.created_at).toLocaleString() : ""}</small></div></div>`).join("") || `<p class="muted">${updatesError ? "Shipment updates are temporarily unavailable." : "No shipment updates yet. We’ll show new updates here as the store processes your order."}</p>`}</div><div class="orderActionRow"><button type="button" class="secondary" data-order-receipt="${esc(o.id)}">Download / Print receipt</button><button type="button" class="primary" data-order-reorder="${esc(o.id)}">Reorder items</button></div></article>`;
   }
-  $("ordersList").innerHTML = html;
+  list.innerHTML = html;
   applyOrderFilter("ongoing");
 }
 function printCustomerOrderReceipt(orderId) {
