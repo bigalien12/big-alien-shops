@@ -2833,3 +2833,13 @@ if (confirmDeleteAccountBtn) {
     }
   });
 }
+
+// Make the discovery section arrows respond directly on mobile as well as desktop.
+// Stop propagation so the document-level delegated handler does not open the page twice.
+document.querySelectorAll("[data-discovery-open]").forEach((button) => {
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    openDiscoveryPage(button.dataset.discoveryOpen);
+  });
+});
