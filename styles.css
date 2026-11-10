@@ -220,12 +220,21 @@ body.dark .orderProducts{border-color:var(--line)}
 body.dark .checkoutRewardsPanel{background:#172b46;border-color:#35577e;color:#f1f5fb}body.dark .checkoutRewardsPanel h3,body.dark .checkoutTotals .checkoutGrandTotal{color:#8bb8ff}body.dark .checkoutTotals>div{border-color:#40516b}
 
 
-/* BIG ALIEN owner-only sales analytics */
-.analyticsGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0}
-.analyticsStat,.analyticsPanel{background:var(--surface,#fff);border:1px solid var(--line);border-radius:16px;padding:16px;min-width:0}
-.analyticsStat{display:grid;gap:7px}.analyticsStat span{font-size:13px;color:var(--muted)}.analyticsStat strong{font-size:clamp(20px,3vw,27px);overflow-wrap:anywhere}
-.analyticsStat.success strong{color:#15803d}.analyticsStat.info strong{color:var(--blue)}.analyticsStat.warning strong{color:#b7791f}.analyticsStat.danger strong{color:#dc2626}
-.analyticsPanel{margin:14px 0}.analyticsPanel h3{margin:0 0 12px}.analyticsRevenueRows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.analyticsRevenueRows>div{display:flex;justify-content:space-between;gap:10px;padding:12px;background:var(--bg);border-radius:10px;min-width:0}.analyticsRevenueRows span{color:var(--muted)}.analyticsRevenueRows b{text-align:right;overflow-wrap:anywhere}
-.analyticsBestList{display:grid;gap:8px}.analyticsBestList>div{display:grid;grid-template-columns:28px minmax(0,1fr) auto auto;align-items:center;gap:9px;padding:10px 0;border-bottom:1px solid var(--line)}.analyticsBestList>div:last-child{border-bottom:0}.analyticsBestList b{overflow-wrap:anywhere}.analyticsBestList span:not(.analyticsRank){font-size:12px;color:var(--muted);white-space:nowrap}.analyticsRank{display:grid;place-items:center;width:25px;height:25px;border-radius:50%;background:#eaf2ff;color:var(--blue);font-weight:800}.analyticsFootnote{margin:12px 2px}
-body.dark .analyticsStat,body.dark .analyticsPanel{background:#111c2d;color:var(--ink)}body.dark .analyticsRevenueRows>div{background:#0b1220}body.dark .analyticsRank{background:#1d3558;color:#bfdbfe}
-@media(max-width:700px){.analyticsGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.analyticsBestList>div{grid-template-columns:26px minmax(0,1fr) auto}.analyticsBestList>div strong{grid-column:2/4}.analyticsRevenueRows{grid-template-columns:1fr}}
+/* Compact cards on the full Recently Viewed / Recommended For You pages only. */
+#discoveryPageGrid.grid { grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; }
+#discoveryPageGrid .card { min-width:0; }
+#discoveryPageGrid .discoveryImageWrap { position:relative; height:160px; overflow:hidden; background:#f5f7fb; }
+#discoveryPageGrid .discoveryImageWrap > button[data-product] { width:100%; height:100%; }
+#discoveryPageGrid .discoveryImageWrap img { display:block; width:100%; height:100%; object-fit:contain; }
+#discoveryPageGrid .discoveryQuickAdd { position:absolute; top:8px; right:8px; width:34px; height:34px; padding:0; border-radius:50%; font-size:22px; line-height:1; z-index:1; }
+#discoveryPageGrid .cardBody { padding:10px; }
+#discoveryPageGrid .cardBody h3 { font-size:14px; line-height:1.35; margin:4px 0 6px; overflow-wrap:anywhere; }
+#discoveryPageGrid .price { font-size:17px; margin:4px 0; }
+@media(max-width:850px) { #discoveryPageGrid.grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; } }
+@media(max-width:560px) {
+  #discoveryPageGrid .discoveryImageWrap { height:135px; }
+  #discoveryPageGrid .discoveryQuickAdd { width:32px; height:32px; font-size:20px; }
+  #discoveryPageGrid .cardBody { padding:9px; }
+  #discoveryPageGrid .cardBody h3 { font-size:13px; }
+  #discoveryPageGrid .price { font-size:16px; }
+}
