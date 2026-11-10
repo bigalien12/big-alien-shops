@@ -86,6 +86,7 @@ function show(id, remember = true) {
     "authView",
     "otpView",
     "homeView",
+    "discoveryView",
     "productView",
     "cartView",
     "checkoutView",
@@ -232,26 +233,37 @@ function rememberViewedProduct(id) {
   try { localStorage.setItem(key, JSON.stringify(ids)); } catch (_) {}
 }
 function discoveryProductCard(p) {
-  return `<article class="card"><button type="button" data-product="${esc(p.id)}" aria-label="View ${esc(p.name)}" style="display:block;width:100%;padding:0;border:0;background:transparent;cursor:pointer;line-height:0"><img src="${esc(imageOrFallback(p.image_url))}" alt="${esc(p.name)}" loading="lazy" decoding="async" style="display:block;width:100%;height:auto"></button><div class="cardBody"><div class="muted">${esc(p.category || "Product")}</div><h3>${esc(p.name)}</h3><div class="price">${money(p.price)}</div><div class="stockBadge ${productStock(p) > 0 ? "inStock" : "outStock"}">${productStock(p) > 0 ? "● In Stock" : "Out of Stock"}</div><button class="primary" type="button" data-product="${esc(p.id)}">View Product</button></div></article>`;
+  const inStock = productStock(p) > 0;
+  return `<article class="card"><div class="discoveryImageWrap"><button type="button" data-product="${esc(p.id)}" aria-label="View ${esc(p.name)}" style="display:block;width:100%;padding:0;border:0;background:transparent;cursor:pointer;line-height:0"><img src="${esc(imageOrFallback(p.image_url))}" alt="${esc(p.name)}" loading="lazy" decoding="async"></button><button type="button" class="discoveryQuickAdd" data-discovery-add="${esc(p.id)}" aria-label="Add ${esc(p.name)} to cart" ${inStock ? "" : "disabled"}>+</button></div><div class="cardBody"><div class="muted">${esc(p.category || "Product")}</div><h3>${esc(p.name)}</h3><div class="price">${money(p.price)}</div></div></article>`;
+}
+function getRecommendedProducts() {
+  const recent = getRecentProductIds().map(productById).filter(Boolean);
+  const viewed = new Set(getRecentProductIds());
+  const preferredCategories = recent.map(p => String(p.category || "").toLowerCase());
+  return products.filter(p => productStock(p) > 0 && !viewed.has(String(p.id)))
+    .sort((a, b) => Number(preferredCategories.includes(String(b.category || "").toLowerCase())) - Number(preferredCategories.includes(String(a.category || "").toLowerCase())))
+    .slice(0, 12);
 }
 function renderProductDiscovery() {
   const recentSection = $("recentlyViewedSection");
   const recommendedSection = $("recommendedProductsSection");
   if (!recentSection || !recommendedSection) return;
   const recent = getRecentProductIds().map(productById).filter(Boolean);
+  const suggestions = getRecommendedProducts();
   recentSection.classList.toggle("hidden", !recent.length);
-  $("recentlyViewedGrid").innerHTML = recent.slice(0, 6).map(discoveryProductCard).join("");
-
-  // Suggest available products in the same categories as recently opened items.
-  // Fall back to other available items when there is no browsing history.
-  const viewed = new Set(getRecentProductIds());
-  const preferredCategories = recent.map(p => String(p.category || "").toLowerCase());
-  const suggestions = products.filter(p => productStock(p) > 0 && !viewed.has(String(p.id)))
-    .sort((a, b) => Number(preferredCategories.includes(String(b.category || "").toLowerCase())) - Number(preferredCategories.includes(String(a.category || "").toLowerCase())))
-    .slice(0, 6);
+  $("recentlyViewedGrid").innerHTML = recent.slice(0, 8).map(discoveryProductCard).join("");
   recommendedSection.classList.toggle("hidden", !suggestions.length);
-  $("recommendedProductsGrid").innerHTML = suggestions.map(discoveryProductCard).join("");
+  $("recommendedProductsGrid").innerHTML = suggestions.slice(0, 8).map(discoveryProductCard).join("");
 }
+function openDiscoveryPage(type) {
+  const isRecent = type === "recent";
+  const items = isRecent ? getRecentProductIds().map(productById).filter(Boolean) : getRecommendedProducts();
+  $("discoveryPageTitle").textContent = isRecent ? "Recently Viewed 👁" : "Recommended For You 👽";
+  $("discoveryPageGrid").innerHTML = items.length ? items.map(discoveryProductCard).join("") : `<div class="summary"><p>No products to show yet.</p></div>`;
+  show("discoveryView");
+  window.scrollTo({top:0, behavior:"auto"});
+}
+
 function renderProducts() {
   let list = products.filter(
     (p) =>
@@ -2048,6 +2060,28 @@ document.addEventListener("click", async (e) => {
   if (t.dataset.orderReorder) {
     e.preventDefault();
     await reorderCustomerOrder(t.dataset.orderReorder);
+    return;
+  }
+  if (t.dataset.discoveryOpen) {
+    e.preventDefault();
+    openDiscoveryPage(t.dataset.discoveryOpen);
+    return;
+  }
+  if (t.id === "discoveryBackBtn") {
+    e.preventDefault();
+    show("homeView");
+    renderProducts();
+    return;
+  }
+  if (t.dataset.discoveryAdd) {
+    e.preventDefault();
+    const product = productById(t.dataset.discoveryAdd);
+    if (!product || productStock(product) < 1) {
+      wishlistToast("This product is currently out of stock.", false);
+      return;
+    }
+    addCart(product, 1);
+    wishlistToast(`${product.name} added to your cart.`);
     return;
   }
   if (t.dataset.view === "home") {

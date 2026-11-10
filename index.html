@@ -37,6 +37,12 @@
 .accountDetailsCard .accountAvatar{margin-bottom:12px}
 </style>
 
+
+<style>
+.discoverySection{margin:20px 0 24px;padding:14px;background:#f1efff;border-radius:18px;overflow:hidden}.discoverySection#recentlyViewedSection{background:#edf9ef}.discoveryHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px}.discoveryHead h2{margin:0;font-size:20px}.discoveryArrow{width:42px;height:38px;padding:0;border:0;border-radius:999px;background:#fff;color:#075bea;font-size:25px;line-height:1}.discoveryRail{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(155px,42%);gap:12px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;padding:2px 1px 8px}.discoveryRail .card{scroll-snap-align:start;min-width:0}.discoveryRail .card img{width:100%;height:125px;object-fit:contain;background:#fff;padding:8px}.discoveryRail .cardBody{padding:10px}.discoveryRail .cardBody h3{font-size:14px;line-height:1.35;min-height:38px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.discoveryRail .price{font-size:18px}.discoveryQuickAdd{position:absolute;right:9px;top:9px;width:36px;height:36px;border:0;border-radius:50%;padding:0;background:#111!important;color:#fff!important;font-size:25px;line-height:1;z-index:2}.discoveryImageWrap{position:relative}.discoveryPageHead{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:16px}.discoveryPageHead h2{margin:0}.discoveryPageGrid{display:grid}.dark .discoverySection{background:#202b42}.dark .discoverySection#recentlyViewedSection{background:#1d342b}.dark .discoveryArrow{background:#15243a;color:#fff}
+@media(max-width:560px){.discoverySection{padding:11px;border-radius:16px}.discoveryHead h2{font-size:18px}.discoveryRail{grid-auto-columns:minmax(145px,46%);gap:9px}.discoveryRail .card img{height:112px}.discoveryQuickAdd{width:34px;height:34px}}
+</style>
+
 </head>
 <body>
 <header class="top">
@@ -109,9 +115,14 @@
     <div class="hero"><div><h1>Shop smart with Big Alien Venture 👽</h1><p>Solar · Food · Men's wear · Electronics</p></div><a href="https://wa.me/2347025136166" class="whatsapp">WhatsApp Customer Service</a></div>
     <div class="strips"><span>🚚 Reliable delivery</span><span>💳 Safe payment</span><span>🛡️ Secure accounts</span></div>
     <div class="sectionHead"><h2 id="shopTitle">All Products</h2><span id="resultCount"></span></div>
+    <section id="recommendedProductsSection" class="hidden discoverySection" aria-label="Recommended products"><div class="discoveryHead"><h2>Recommended For You 👽</h2><button type="button" class="discoveryArrow" data-discovery-open="recommended" aria-label="See all recommended products">→</button></div><div id="recommendedProductsGrid" class="discoveryRail"></div></section>
+    <section id="recentlyViewedSection" class="hidden discoverySection" aria-label="Recently viewed products"><div class="discoveryHead"><h2>Recently Viewed 👁</h2><button type="button" class="discoveryArrow" data-discovery-open="recent" aria-label="See all recently viewed products">→</button></div><div id="recentlyViewedGrid" class="discoveryRail"></div></section>
     <div id="productGrid" class="grid"></div>
-    <section id="recentlyViewedSection" class="hidden" aria-label="Recently viewed products" style="margin-top:28px"><div class="sectionHead"><h2>Recently Viewed</h2></div><div id="recentlyViewedGrid" class="grid"></div></section>
-    <section id="recommendedProductsSection" class="hidden" aria-label="Recommended products" style="margin-top:28px"><div class="sectionHead"><h2>Recommended For You</h2></div><div id="recommendedProductsGrid" class="grid"></div></section>
+  </section>
+
+  <section id="discoveryView" class="hidden">
+    <div class="discoveryPageHead"><button type="button" class="secondary" id="discoveryBackBtn">← Back to marketplace</button><h2 id="discoveryPageTitle">Discover products</h2></div>
+    <div id="discoveryPageGrid" class="grid"></div>
   </section>
 
   <section id="productView" class="hidden"></section>
