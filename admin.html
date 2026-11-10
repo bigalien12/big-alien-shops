@@ -8,6 +8,28 @@
   <link rel="icon" href="images/logo.png">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="admin.css">
+
+<style id="bigAlienAnalyticsStyles">
+  .analyticsIntro{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0 16px}
+  .analyticsIntro h2{margin:0}.analyticsIntro p{margin:4px 0;color:var(--muted)}
+  .analyticsGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:14px 0}
+  .analyticsMetric{background:#fff;border:1px solid var(--line);border-radius:15px;padding:15px;min-width:0;box-shadow:0 3px 12px #17255408}
+  .analyticsMetric span{display:block;color:var(--muted);font-size:12px;font-weight:700}
+  .analyticsMetric strong{display:block;font-size:clamp(20px,3vw,27px);line-height:1.2;margin-top:7px;overflow-wrap:anywhere}
+  .analyticsPanel{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;margin:14px 0}
+  .analyticsPanel h3{margin:0 0 12px}.analyticsBars{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;align-items:end;min-height:170px}
+  .analyticsBarCol{display:flex;flex-direction:column;align-items:center;justify-content:end;gap:6px;min-width:0;height:170px}
+  .analyticsBarValue{font-size:10px;color:var(--muted);overflow-wrap:anywhere;text-align:center}
+  .analyticsBar{width:min(100%,34px);min-height:5px;background:linear-gradient(180deg,#3287ff,#0866f5);border-radius:8px 8px 3px 3px}
+  .analyticsBarLabel{font-size:11px;color:var(--muted);text-align:center}
+  .analyticsTopRow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:11px 0;border-top:1px solid var(--line)}
+  .analyticsTopRow:first-of-type{border-top:0}.analyticsTopRow b{overflow-wrap:anywhere}.analyticsTopRow span{font-size:13px;color:var(--muted);white-space:nowrap}
+  .analyticsNotice{padding:12px;border-radius:12px;background:#eff6ff;color:#17427c;border:1px solid #bfdbfe}
+  body.dark .analyticsMetric,body.dark .analyticsPanel{background:#111c2d;color:var(--ink)}
+  body.dark .analyticsNotice{background:#172b46;color:#dbeafe;border-color:#35577e}
+  @media(max-width:760px){.analyticsGrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media(max-width:420px){.analyticsMetric{padding:12px}.analyticsPanel{padding:12px}.analyticsBars{gap:4px}.analyticsBarValue{font-size:9px}.analyticsTopRow{grid-template-columns:minmax(0,1fr) auto;gap:5px}.analyticsTopRow span:last-child{grid-column:2}}
+</style>
 </head>
 <body>
 <header class="top">
@@ -27,11 +49,12 @@
   <section id="adminApp" class="hidden">
     <div class="adminTitle"><div><h1>👑 Owner Dashboard</h1><p>Manage products, orders, payments and shipment updates.</p></div><button class="primary" id="addProductBtn">➕ Add Product</button></div>
     <section id="adminMessagesPanel" class="notificationPanel hidden" aria-labelledby="adminMessagesTitle"><div class="notificationPanelHead"><h2 id="adminMessagesTitle">Admin Notifications</h2><button class="secondary" id="refreshAdminMessages" type="button">Refresh</button></div><div id="adminMessages"><p class="notificationEmpty">New orders and customer payment reports will appear here.</p></div></section>
-    <div class="adminTabs"><button class="active" data-tab="products">Products</button><button data-tab="orders">Orders & Shipment</button><button data-tab="reviews">Customer Reviews</button><button data-tab="rewards">Customer Rewards</button></div>
+    <div class="adminTabs"><button class="active" data-tab="products">Products</button><button data-tab="orders">Orders & Shipment</button><button data-tab="reviews">Customer Reviews</button><button data-tab="rewards">Customer Rewards</button><button data-tab="analytics">📊 Sales Analytics</button></div>
     <section id="productsTab"><div id="adminProducts"></div></section>
     <section id="ordersTab" class="hidden"><div id="adminOrders"></div></section>
     <section id="reviewsTab" class="hidden"><div id="adminReviews"></div></section>
     <section id="rewardsTab" class="hidden"><div id="adminRewards"></div></section>
+    <section id="analyticsTab" class="hidden"><div id="adminAnalytics"></div></section>
   </section>
 </main>
 <div id="productModal" class="modal hidden"><div class="modalCard"><button class="close" data-close="productModal">×</button><h2 id="productModalTitle">Add Product</h2><form id="productForm"><input id="productId" type="hidden"><label>Product name<input id="productName" required></label><label>Category<input id="productCategory" value="Solar" required></label><label>Price (₦)<input id="productPrice" type="number" min="0" required></label><label>Stock<input id="productStock" type="number" min="0" required></label><label>Description<textarea id="productDescription" placeholder="Product details customers should see"></textarea></label><label>Available sizes (for clothes/shoes; separate with commas)<input id="productSizes" placeholder="S, M, L, XL, 40, 41, 42"></label><label>Available colors (separate with commas)<input id="productColors" placeholder="Black, White, Blue"></label><label>Product pictures (select multiple pictures for this one product)<input id="productImage" type="file" accept="image/*" multiple></label><p class="small muted">Select several photos for the same product. The first photo is the main photo.</p><div id="imagePreview"></div><p id="productMsg" class="small"></p><button class="primary" type="submit">Save Product</button></form></div></div>
@@ -39,7 +62,7 @@
 <footer>© Big Alien Venture 👽 · Admin dashboard</footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="admin.js?v=5"></script>
+<script src="admin.js?v=6"></script>
   <script type="module" src="notifications.js"></script>
 </body>
 </html>

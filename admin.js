@@ -101,6 +101,121 @@ async function loadRewardsAdmin() {
   }).join("");
 }
 
+
+async function loadAnalytics() {
+  const box = $("adminAnalytics");
+  if (!box || !sb) return;
+  box.innerHTML = '<p class="muted">Loading your store analytics…</p>';
+
+  // Read-only reporting: this section never writes to orders, payments or products.
+  const [ordersResult, itemsResult] = await Promise.all([
+    sb.from("orders")
+      .select("id,total,payment_status,order_status,created_at")
+      .order("created_at", { ascending: false })
+      .limit(5000),
+    sb.from("order_items")
+      .select("order_id,product_name,quantity,product_price")
+      .limit(10000),
+  ]);
+
+  if (ordersResult.error) {
+    box.innerHTML = `<div class="summary"><b>Could not load sales analytics.</b><p>${esc(ordersResult.error.message)}</p><p class="muted">Check that the admin account has permission to read the orders table.</p></div>`;
+    return;
+  }
+
+  const orders = ordersResult.data || [];
+  const paidOrders = orders.filter(o => String(o.payment_status || "").toLowerCase() === "paid");
+  const moneyTotal = rows => rows.reduce((sum, o) => sum + Math.max(0, Number(o.total) || 0), 0);
+  const totalRevenue = moneyTotal(paidOrders);
+  const now = new Date();
+  const todayKey = dateKeyForAnalytics(now);
+  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const recentStart = new Date(now);
+  recentStart.setHours(0, 0, 0, 0);
+  recentStart.setDate(recentStart.getDate() - 6);
+  const recentStartKey = dateKeyForAnalytics(recentStart);
+  const paidToday = paidOrders.filter(o => dateKeyForAnalytics(o.created_at) === todayKey);
+  const paidThisMonth = paidOrders.filter(o => String(o.created_at || "").slice(0, 7) === monthKey);
+  const paidLastSevenDays = paidOrders.filter(o => {
+    const key = dateKeyForAnalytics(o.created_at);
+    return key && key >= recentStartKey && key <= todayKey;
+  });
+  const pendingOrders = orders.filter(o => {
+    const status = String(o.order_status || "processing").toLowerCase();
+    return !["delivered", "cancelled"].includes(status);
+  });
+  const failedPayments = orders.filter(o => String(o.payment_status || "").toLowerCase() === "failed");
+
+  const daily = [];
+  for (let offset = 6; offset >= 0; offset--) {
+    const day = new Date(now);
+    day.setHours(0, 0, 0, 0);
+    day.setDate(day.getDate() - offset);
+    const key = dateKeyForAnalytics(day);
+    daily.push({
+      key,
+      label: day.toLocaleDateString("en-NG", { weekday: "short" }),
+      value: moneyTotal(paidOrders.filter(o => dateKeyForAnalytics(o.created_at) === key)),
+    });
+  }
+  const maxDaily = Math.max(1, ...daily.map(d => d.value));
+  const dailyHtml = daily.map(d => {
+    const height = d.value > 0 ? Math.max(8, Math.round((d.value / maxDaily) * 112)) : 5;
+    return `<div class="analyticsBarCol"><span class="analyticsBarValue">${d.value ? money(d.value) : "₦0"}</span><div class="analyticsBar" style="height:${height}px" title="${esc(d.label)}: ${money(d.value)}"></div><span class="analyticsBarLabel">${esc(d.label)}</span></div>`;
+  }).join("");
+
+  let topProductsHtml = "";
+  if (itemsResult.error) {
+    topProductsHtml = `<p class="muted">Best-selling products could not be loaded: ${esc(itemsResult.error.message)}</p>`;
+  } else {
+    const paidIds = new Set(paidOrders.map(o => o.id));
+    const productTotals = new Map();
+    (itemsResult.data || []).forEach(item => {
+      if (!paidIds.has(item.order_id)) return;
+      const name = String(item.product_name || "Unnamed product");
+      const quantity = Math.max(0, Number(item.quantity) || 0);
+      const unitPrice = Math.max(0, Number(item.product_price) || 0);
+      const current = productTotals.get(name) || { quantity: 0, revenue: 0 };
+      current.quantity += quantity;
+      current.revenue += quantity * unitPrice;
+      productTotals.set(name, current);
+    });
+    const top = [...productTotals.entries()].sort((a, b) => b[1].quantity - a[1].quantity).slice(0, 5);
+    topProductsHtml = top.length
+      ? top.map(([name, stats], index) => `<div class="analyticsTopRow"><b>${index + 1}. ${esc(name)}</b><span>${stats.quantity.toLocaleString("en-NG")} sold</span><strong>${money(stats.revenue)}</strong></div>`).join("")
+      : '<p class="muted">No products from paid orders are available yet.</p>';
+  }
+
+  box.innerHTML = `
+    <div class="analyticsIntro">
+      <div><h2>📊 Sales Analytics</h2><p>Store performance based on recorded orders and successful payments.</p></div>
+      <button class="secondary" type="button" id="refreshSalesAnalytics">↻ Refresh Analytics</button>
+    </div>
+    <div class="analyticsNotice">Revenue includes orders marked <b>paid</b>. Pending orders are orders not yet marked delivered or cancelled. Figures reflect the order records returned by Supabase.</div>
+    <div class="analyticsGrid">
+      <article class="analyticsMetric"><span>Total Revenue</span><strong>${money(totalRevenue)}</strong></article>
+      <article class="analyticsMetric"><span>Total Orders</span><strong>${orders.length.toLocaleString("en-NG")}</strong></article>
+      <article class="analyticsMetric"><span>Pending Orders</span><strong>${pendingOrders.length.toLocaleString("en-NG")}</strong></article>
+      <article class="analyticsMetric"><span>Failed Payments</span><strong>${failedPayments.length.toLocaleString("en-NG")}</strong></article>
+      <article class="analyticsMetric"><span>Revenue Today</span><strong>${money(moneyTotal(paidToday))}</strong></article>
+      <article class="analyticsMetric"><span>Revenue · Last 7 Days</span><strong>${money(moneyTotal(paidLastSevenDays))}</strong></article>
+      <article class="analyticsMetric"><span>Revenue · This Month</span><strong>${money(moneyTotal(paidThisMonth))}</strong></article>
+      <article class="analyticsMetric"><span>Successful Payments</span><strong>${paidOrders.length.toLocaleString("en-NG")}</strong></article>
+    </div>
+    <section class="analyticsPanel"><h3>Revenue · Last 7 Days</h3><div class="analyticsBars">${dailyHtml}</div></section>
+    <section class="analyticsPanel"><h3>🏆 Best-selling Products</h3>${topProductsHtml}</section>
+    ${orders.length === 0 ? '<div class="summary"><p>No orders have been recorded yet. Analytics will appear here when customers place orders.</p></div>' : ''}
+  `;
+  $("refreshSalesAnalytics")?.addEventListener("click", loadAnalytics);
+}
+
+function dateKeyForAnalytics(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 async function loadNotifications() {
   const box = $("adminMessages");
   if (!box || !sb || !adminUser) return;
@@ -409,8 +524,10 @@ document.addEventListener("click", async (e) => {
     $("ordersTab").classList.toggle("hidden", t.dataset.tab !== "orders");
     $("reviewsTab").classList.toggle("hidden", t.dataset.tab !== "reviews");
     $("rewardsTab").classList.toggle("hidden", t.dataset.tab !== "rewards");
+    $("analyticsTab").classList.toggle("hidden", t.dataset.tab !== "analytics");
     if (t.dataset.tab === "reviews") await loadReviews();
     if (t.dataset.tab === "rewards") await loadRewardsAdmin();
+    if (t.dataset.tab === "analytics") await loadAnalytics();
   }
   if (t.dataset.reviewApprove) await moderateReview(t.dataset.reviewApprove, "approved");
   if (t.dataset.reviewReject) await moderateReview(t.dataset.reviewReject, "rejected");
