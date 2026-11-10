@@ -1551,6 +1551,73 @@ async function openAdmin() {
   loadAdminOrders();
   loadAdminNotifications();
 }
+async function loadAdminAnalytics() {
+  const box = $("adminAnalytics");
+  if (!box) return;
+  box.innerHTML = `<div class="summary">Loading sales analytics…</div>`;
+  const { data: orders, error } = await sb
+    .from("orders")
+    .select("id,total,payment_status,order_status,created_at")
+    .order("created_at", { ascending: false });
+  if (error) {
+    box.innerHTML = `<div class="summary">Could not load sales analytics: ${esc(error.message)}</div>`;
+    return;
+  }
+  const rows = orders || [];
+  const norm = value => String(value || "").trim().toLowerCase();
+  const paid = rows.filter(o => ["paid", "success", "successful", "completed"].includes(norm(o.payment_status)));
+  const failed = rows.filter(o => ["failed", "declined", "cancelled", "canceled"].includes(norm(o.payment_status)));
+  const pending = rows.filter(o => ["pending", "processing", "awaiting payment", "awaiting_payment"].includes(norm(o.payment_status)) || ["pending", "processing"].includes(norm(o.order_status)));
+  const revenue = paid.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+  const paidOrderIds = paid.map(o => o.id);
+  let bestSellers = [];
+  let itemNotice = "";
+  if (paidOrderIds.length) {
+    const { data: items, error: itemError } = await sb
+      .from("order_items")
+      .select("order_id,product_name,quantity,product_price")
+      .in("order_id", paidOrderIds);
+    if (itemError) {
+      itemNotice = `<p class="muted">Best-selling products are unavailable because order items could not be read: ${esc(itemError.message)}</p>`;
+    } else {
+      const totals = new Map();
+      (items || []).forEach(item => {
+        const name = item.product_name || "Product";
+        const current = totals.get(name) || { name, quantity: 0, revenue: 0 };
+        const quantity = Number(item.quantity) || 0;
+        current.quantity += quantity;
+        current.revenue += quantity * (Number(item.product_price) || 0);
+        totals.set(name, current);
+      });
+      bestSellers = [...totals.values()].sort((a,b) => b.quantity-a.quantity).slice(0,5);
+    }
+  }
+  const now = new Date();
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const weekStart = new Date(dayStart); weekStart.setDate(weekStart.getDate()-6);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const sumSince = start => paid.filter(o => o.created_at && new Date(o.created_at) >= start).reduce((sum,o) => sum + (Number(o.total)||0),0);
+  const stats = [
+    ["Total revenue", money(revenue), "success"],
+    ["Total orders", rows.length.toLocaleString("en-NG"), "info"],
+    ["Pending orders", pending.length.toLocaleString("en-NG"), "warning"],
+    ["Failed payments", failed.length.toLocaleString("en-NG"), "danger"]
+  ];
+  box.innerHTML = `
+    <div class="analyticsGrid">${stats.map(([label,value,tone]) => `<article class="analyticsStat ${tone}"><span>${label}</span><strong>${value}</strong></article>`).join("")}</div>
+    <section class="analyticsPanel"><h3>Revenue overview</h3><div class="analyticsRevenueRows">
+      <div><span>Today</span><b>${money(sumSince(dayStart))}</b></div>
+      <div><span>Last 7 days</span><b>${money(sumSince(weekStart))}</b></div>
+      <div><span>This month</span><b>${money(sumSince(monthStart))}</b></div>
+      <div><span>All time (paid orders)</span><b>${money(revenue)}</b></div>
+    </div><p class="muted">Revenue is calculated from orders whose payment status is marked paid/successful/completed.</p></section>
+    <section class="analyticsPanel"><h3>Best-selling products</h3>
+      ${bestSellers.length ? `<div class="analyticsBestList">${bestSellers.map((item,i)=>`<div><span class="analyticsRank">${i+1}</span><b>${esc(item.name)}</b><span>${item.quantity} sold</span><strong>${money(item.revenue)}</strong></div>`).join("")}</div>` : `<p class="muted">No paid order item data is available yet.</p>`}
+      ${itemNotice}
+    </section>
+    <p class="muted analyticsFootnote">Figures are based on the orders currently accessible to your admin account. Use Refresh Analytics after new orders or payment updates.</p>`;
+}
+
 async function loadAdminProducts() {
   let { data, error } = await sb
     .from("products")
@@ -2244,19 +2311,14 @@ document.addEventListener("click", async (e) => {
   }
   if (t.dataset.orderFilter) applyOrderFilter(t.dataset.orderFilter);
   if (t.dataset.adminTab) {
-    $("adminProductsTab").classList.toggle(
-      "hidden",
-      t.dataset.adminTab !== "products"
+    ["products", "orders", "analytics"].forEach(tab => {
+      const panel = $("admin" + tab.charAt(0).toUpperCase() + tab.slice(1) + "Tab");
+      if (panel) panel.classList.toggle("hidden", t.dataset.adminTab !== tab);
+    });
+    document.querySelectorAll("[data-admin-tab]").forEach(x =>
+      x.classList.toggle("active", x.dataset.adminTab === t.dataset.adminTab)
     );
-    $("adminOrdersTab").classList.toggle(
-      "hidden",
-      t.dataset.adminTab !== "orders"
-    );
-    document
-      .querySelectorAll("[data-admin-tab]")
-      .forEach((x) =>
-        x.classList.toggle("active", x.dataset.adminTab === t.dataset.adminTab)
-      );
+    if (t.dataset.adminTab === "analytics") loadAdminAnalytics();
   }
 });
 $("loginForm").onsubmit = async (e) => {
@@ -2432,6 +2494,7 @@ if ($("adminNotificationsBtn"))
   };
 if ($("refreshAdminNotifications"))
   $("refreshAdminNotifications").onclick = loadAdminNotifications;
+if ($("refreshAdminAnalytics")) $("refreshAdminAnalytics").onclick = loadAdminAnalytics;
 if ($("refreshCustomerNotifications"))
   $("refreshCustomerNotifications").onclick = loadCustomerNotifications;
 if ($("logoutBtn")) $("logoutBtn").onclick = () => sb.auth.signOut();
