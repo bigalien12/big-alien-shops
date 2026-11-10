@@ -110,6 +110,8 @@
     <div class="strips"><span>🚚 Reliable delivery</span><span>💳 Safe payment</span><span>🛡️ Secure accounts</span></div>
     <div class="sectionHead"><h2 id="shopTitle">All Products</h2><span id="resultCount"></span></div>
     <div id="productGrid" class="grid"></div>
+    <section id="recentlyViewedSection" class="hidden" aria-label="Recently viewed products" style="margin-top:28px"><div class="sectionHead"><h2>Recently Viewed</h2></div><div id="recentlyViewedGrid" class="grid"></div></section>
+    <section id="recommendedProductsSection" class="hidden" aria-label="Recommended products" style="margin-top:28px"><div class="sectionHead"><h2>Recommended For You</h2></div><div id="recommendedProductsGrid" class="grid"></div></section>
   </section>
 
   <section id="productView" class="hidden"></section>
@@ -453,7 +455,7 @@
 <footer>© Big Alien Venture 👽 · Customer service 07025136166</footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="app.js?v=13"></script>
+<script src="app.js?v=14"></script>
 <script>
   document.querySelectorAll('.passwordToggle[data-password-target]').forEach(function(button){
     button.addEventListener('click', function(){

@@ -212,6 +212,46 @@ function renderCats() {
     )
     .join("");
 }
+// Browsing history is stored only on this device, separately for each signed-in customer.
+function browsingHistoryKey() {
+  return user?.id ? `bav_recent_products_${user.id}` : null;
+}
+function getRecentProductIds() {
+  const key = browsingHistoryKey();
+  if (!key) return [];
+  try {
+    const ids = JSON.parse(localStorage.getItem(key) || "[]");
+    return Array.isArray(ids) ? ids.filter(id => typeof id === "string").slice(0, 12) : [];
+  } catch (_) { return []; }
+}
+function rememberViewedProduct(id) {
+  const key = browsingHistoryKey();
+  if (!key) return;
+  const value = String(id);
+  const ids = [value, ...getRecentProductIds().filter(x => x !== value)].slice(0, 12);
+  try { localStorage.setItem(key, JSON.stringify(ids)); } catch (_) {}
+}
+function discoveryProductCard(p) {
+  return `<article class="card"><button type="button" data-product="${esc(p.id)}" aria-label="View ${esc(p.name)}" style="display:block;width:100%;padding:0;border:0;background:transparent;cursor:pointer;line-height:0"><img src="${esc(imageOrFallback(p.image_url))}" alt="${esc(p.name)}" loading="lazy" decoding="async" style="display:block;width:100%;height:auto"></button><div class="cardBody"><div class="muted">${esc(p.category || "Product")}</div><h3>${esc(p.name)}</h3><div class="price">${money(p.price)}</div><div class="stockBadge ${productStock(p) > 0 ? "inStock" : "outStock"}">${productStock(p) > 0 ? "● In Stock" : "Out of Stock"}</div><button class="primary" type="button" data-product="${esc(p.id)}">View Product</button></div></article>`;
+}
+function renderProductDiscovery() {
+  const recentSection = $("recentlyViewedSection");
+  const recommendedSection = $("recommendedProductsSection");
+  if (!recentSection || !recommendedSection) return;
+  const recent = getRecentProductIds().map(productById).filter(Boolean);
+  recentSection.classList.toggle("hidden", !recent.length);
+  $("recentlyViewedGrid").innerHTML = recent.slice(0, 6).map(discoveryProductCard).join("");
+
+  // Suggest available products in the same categories as recently opened items.
+  // Fall back to other available items when there is no browsing history.
+  const viewed = new Set(getRecentProductIds());
+  const preferredCategories = recent.map(p => String(p.category || "").toLowerCase());
+  const suggestions = products.filter(p => productStock(p) > 0 && !viewed.has(String(p.id)))
+    .sort((a, b) => Number(preferredCategories.includes(String(b.category || "").toLowerCase())) - Number(preferredCategories.includes(String(a.category || "").toLowerCase())))
+    .slice(0, 6);
+  recommendedSection.classList.toggle("hidden", !suggestions.length);
+  $("recommendedProductsGrid").innerHTML = suggestions.map(discoveryProductCard).join("");
+}
 function renderProducts() {
   let list = products.filter(
     (p) =>
@@ -230,6 +270,7 @@ function renderProducts() {
         )
         .join("")
     : `<div class="summary"><h3>No products found</h3><p>Try another category or search.</p></div>`;
+  renderProductDiscovery();
 }
 async function loadProducts() {
   if (!sb) return;
@@ -261,6 +302,8 @@ let activeProductImages = [];
 function openProduct(id) {
   const p = productById(id);
   if (!p) return;
+  rememberViewedProduct(p.id);
+  renderProductDiscovery();
 
   const images = productImages(p);
   activeProductImages = images;
