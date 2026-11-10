@@ -218,3 +218,23 @@ body.dark .orderProducts{border-color:var(--line)}
 .checkoutRewardsPanel{border:1px solid #cbdaf3;background:#f4f8ff;border-radius:14px;padding:14px;margin:14px 0;display:grid;gap:8px}
 .checkoutRewardsPanel h3{margin:0;color:#075bea}.checkoutRewardsPanel p{margin:0}.checkoutRewardChoice{display:flex;align-items:center;gap:10px;font-weight:700}.checkoutRewardChoice input{width:20px;height:20px;accent-color:#075bea}.checkoutTotals{display:grid;gap:8px;margin-top:6px}.checkoutTotals>div{display:flex;justify-content:space-between;gap:12px;padding-top:7px;border-top:1px solid #dce5f5}.checkoutTotals .checkoutGrandTotal{font-size:1.08rem;font-weight:800;color:#075bea}.checkoutGrandTotal b{font-size:1.2rem}
 body.dark .checkoutRewardsPanel{background:#172b46;border-color:#35577e;color:#f1f5fb}body.dark .checkoutRewardsPanel h3,body.dark .checkoutTotals .checkoutGrandTotal{color:#8bb8ff}body.dark .checkoutTotals>div{border-color:#40516b}
+
+
+/* Compact cards on the full Recently Viewed / Recommended For You pages only. */
+#discoveryPageGrid.grid { grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; }
+#discoveryPageGrid .card { min-width:0; }
+#discoveryPageGrid .discoveryImageWrap { position:relative; height:160px; overflow:hidden; background:#f5f7fb; }
+#discoveryPageGrid .discoveryImageWrap > button[data-product] { width:100%; height:100%; }
+#discoveryPageGrid .discoveryImageWrap img { display:block; width:100%; height:100%; object-fit:contain; }
+#discoveryPageGrid .discoveryQuickAdd { position:absolute; top:8px; right:8px; width:34px; height:34px; padding:0; border-radius:50%; font-size:22px; line-height:1; z-index:1; }
+#discoveryPageGrid .cardBody { padding:10px; }
+#discoveryPageGrid .cardBody h3 { font-size:14px; line-height:1.35; margin:4px 0 6px; overflow-wrap:anywhere; }
+#discoveryPageGrid .price { font-size:17px; margin:4px 0; }
+@media(max-width:850px) { #discoveryPageGrid.grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; } }
+@media(max-width:560px) {
+  #discoveryPageGrid .discoveryImageWrap { height:135px; }
+  #discoveryPageGrid .discoveryQuickAdd { width:32px; height:32px; font-size:20px; }
+  #discoveryPageGrid .cardBody { padding:9px; }
+  #discoveryPageGrid .cardBody h3 { font-size:13px; }
+  #discoveryPageGrid .price { font-size:16px; }
+}
