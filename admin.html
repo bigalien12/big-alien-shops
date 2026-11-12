@@ -50,19 +50,28 @@
     <div class="adminTitle"><div><h1>👑 Owner Dashboard</h1><p>Manage products, orders, payments and shipment updates.</p></div><button class="primary" id="addProductBtn">➕ Add Product</button></div>
     <section id="adminMessagesPanel" class="notificationPanel hidden" aria-labelledby="adminMessagesTitle"><div class="notificationPanelHead"><h2 id="adminMessagesTitle">Admin Notifications</h2><button class="secondary" id="refreshAdminMessages" type="button">Refresh</button></div><div id="adminMessages"><p class="notificationEmpty">New orders and customer payment reports will appear here.</p></div></section>
     <div class="adminTabs"><button class="active" data-tab="products">Products</button><button data-tab="orders">Orders & Shipment</button><button data-tab="reviews">Customer Reviews</button><button data-tab="rewards">Customer Rewards</button><button data-tab="analytics">📊 Sales Analytics</button></div>
-    <section id="productsTab"><div id="adminProducts"></div></section>
+    <section id="productsTab">
+      <div class="departmentAdminFilters" aria-label="Filter products by department">
+        <button type="button" class="active" data-admin-department="all">All Products</button>
+        <button type="button" data-admin-department="chicken">🐔 Chicken</button>
+        <button type="button" data-admin-department="solar">☀️ Solar</button>
+        <button type="button" data-admin-department="general">General Store</button>
+      </div>
+      <p class="small muted">Manage all departments from this one owner account. Choose a department when adding or editing a product.</p>
+      <div id="adminProducts"></div>
+    </section>
     <section id="ordersTab" class="hidden"><div id="adminOrders"></div></section>
     <section id="reviewsTab" class="hidden"><div id="adminReviews"></div></section>
     <section id="rewardsTab" class="hidden"><div id="adminRewards"></div></section>
     <section id="analyticsTab" class="hidden"><div id="adminAnalytics"></div></section>
   </section>
 </main>
-<div id="productModal" class="modal hidden"><div class="modalCard"><button class="close" data-close="productModal">×</button><h2 id="productModalTitle">Add Product</h2><form id="productForm"><input id="productId" type="hidden"><label>Product name<input id="productName" required></label><label>Category<input id="productCategory" value="Solar" required></label><label>Price (₦)<input id="productPrice" type="number" min="0" required></label><label>Stock<input id="productStock" type="number" min="0" required></label><label>Description<textarea id="productDescription" placeholder="Product details customers should see"></textarea></label><label>Available sizes (for clothes/shoes; separate with commas)<input id="productSizes" placeholder="S, M, L, XL, 40, 41, 42"></label><label>Available colors (separate with commas)<input id="productColors" placeholder="Black, White, Blue"></label><label>Product pictures (select multiple pictures for this one product)<input id="productImage" type="file" accept="image/*" multiple></label><p class="small muted">Select several photos for the same product. The first photo is the main photo.</p><div id="imagePreview"></div><p id="productMsg" class="small"></p><button class="primary" type="submit">Save Product</button></form></div></div>
+<div id="productModal" class="modal hidden"><div class="modalCard"><button class="close" data-close="productModal">×</button><h2 id="productModalTitle">Add Product</h2><form id="productForm"><input id="productId" type="hidden"><label>Product name<input id="productName" required></label><label>Department<select id="productDepartment" required><option value="general">General Store</option><option value="chicken">BIG ALIEN CHICKEN</option><option value="solar">BIG ALIEN SOLAR</option></select></label><label>Category<input id="productCategory" value="Solar" required></label><label>Price (₦)<input id="productPrice" type="number" min="0" required></label><label>Stock<input id="productStock" type="number" min="0" required></label><label>Full product description<textarea id="productDescription" rows="9" placeholder="Write a complete explanation customers should read before ordering.\n\nFor homemade chicken: describe the chicken, size/weight, preparation or raising details, and customer instructions.\n\nFor homemade solar generators: explain how it is built, battery type and capacity, inverter wattage/output, panel specifications, features, limitations, and what is included."></textarea></label><p class="small muted">This description appears on the customer product page. You can write several paragraphs.</p><label>Available sizes (for clothes/shoes; separate with commas)<input id="productSizes" placeholder="S, M, L, XL, 40, 41, 42"></label><label>Available colors (separate with commas)<input id="productColors" placeholder="Black, White, Blue"></label><label>Product pictures (select multiple pictures for this one product)<input id="productImage" type="file" accept="image/*" multiple></label><p class="small muted">Select several photos for the same product. The first photo is the main photo.</p><div id="imagePreview"></div><p id="productMsg" class="small"></p><button class="primary" type="submit">Save Product</button></form></div></div>
 <div id="orderModal" class="modal hidden"><div class="modalCard"><button class="close" data-close="orderModal">×</button><div id="orderModalBody"></div></div></div>
 <footer>© Big Alien Venture 👽 · Admin dashboard</footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="admin.js?v=6"></script>
+<script src="admin.js?v=7"></script>
   <script type="module" src="notifications.js"></script>
 </body>
 </html>

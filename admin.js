@@ -8,6 +8,8 @@ const sb = ready
   ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_PUBLISHABLE_KEY)
   : null;
 let adminUser = null;
+let adminProductsCache = [];
+let adminDepartmentFilter = "all";
 const $ = (id) => document.getElementById(id);
 const money = (n) =>
   "₦" + Number(n || 0).toLocaleString("en-NG", { maximumFractionDigits: 0 });
@@ -306,14 +308,17 @@ async function loadProducts() {
       '<div class="summary">' + esc(error.message) + "</div>";
     return;
   }
-  const rows = (data || [])
+  adminProductsCache = data || [];
+  renderAdminProducts();
+}
+function renderAdminProducts() {
+  const rows = adminProductsCache
+    .filter(p => adminDepartmentFilter === "all" || (p.department || "general") === adminDepartmentFilter)
     .map(
-      (p) => `<div class="adminRow"><img src="${esc(img(p.image_url))}" alt=""> <div><b>${esc(p.name)}</b><div class="muted">${esc( p.category )}</div></div><div>${money(p.price)}</div> <div>${p.stock}</div><div>${p.active ? "Live" : "Hidden"}</div> <div><button class="secondary" data-edit="${ p.id }">Edit</button> <button class="danger" data-delete="${ p.id }">Delete</button></div></div>`
+      (p) => `<div class="adminRow"><img src="${esc(img(p.image_url))}" alt=""> <div><b>${esc(p.name)}</b><div class="muted">${esc(p.department || "general")} · ${esc(p.category)}</div></div><div>${money(p.price)}</div> <div>${p.stock}</div><div>${p.active ? "Live" : "Hidden"}</div> <div><button class="secondary" data-edit="${p.id}">Edit</button> <button class="danger" data-delete="${p.id}">Delete</button></div></div>`
     )
     .join("");
-  $(
-    "adminProducts"
-  ).innerHTML = `<div class="adminTable"><div class="adminRow"><b>Image</b><b>Product</b><b>Price</b><b>Stock</b><b>Status</b><b>Actions</b></div>${ rows || '<div class="summary">No products yet.</div>' }</div>`;
+  $("adminProducts").innerHTML = `<div class="adminTable"><div class="adminRow"><b>Image</b><b>Product</b><b>Price</b><b>Stock</b><b>Status</b><b>Actions</b></div>${rows || '<div class="summary">No products in this department yet.</div>'}</div>`;
 }
 async function loadOrders() {
   const { data, error } = await sb
@@ -336,6 +341,7 @@ function openProduct(p) {
   $("productModalTitle").textContent = p ? "Edit Product" : "Add Product";
   $("productId").value = p?.id || "";
   $("productName").value = p?.name || "";
+  $("productDepartment").value = p?.department || "general";
   $("productCategory").value = p?.category || "Solar";
   $("productPrice").value = p?.price ?? "";
   $("productStock").value = p?.stock ?? 0;
@@ -398,6 +404,7 @@ async function saveProduct(e) {
   ];
   const payload = {
     name: $("productName").value.trim(),
+    department: $("productDepartment").value,
     category: $("productCategory").value.trim(),
     price: Number($("productPrice").value),
     stock: Number($("productStock").value),
@@ -514,6 +521,12 @@ document.addEventListener("click", async (e) => {
   const t = e.target.closest("button") || e.target;
   if (t.dataset.readNotification) {
     await markNotificationRead(t.dataset.readNotification);
+    return;
+  }
+  if (t.dataset.adminDepartment) {
+    adminDepartmentFilter = t.dataset.adminDepartment;
+    document.querySelectorAll("[data-admin-department]").forEach(x => x.classList.toggle("active", x === t));
+    renderAdminProducts();
     return;
   }
   if (t.dataset.tab) {

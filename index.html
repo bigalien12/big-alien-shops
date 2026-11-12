@@ -114,7 +114,13 @@
   <section id="homeView" class="hidden">
     <div class="hero"><div><h1>Shop smart with Big Alien Venture 👽</h1><p>Solar · Food · Men's wear · Electronics</p></div><a href="https://wa.me/2347025136166" class="whatsapp">WhatsApp Customer Service</a></div>
     <div class="strips"><span>🚚 Reliable delivery</span><span>💳 Safe payment</span><span>🛡️ Secure accounts</span></div>
-    <div class="sectionHead"><h2 id="shopTitle">All Products</h2><span id="resultCount"></span></div>
+    <section id="departmentChooser" class="departmentChooser" aria-label="Choose a department">
+      <button type="button" class="departmentCard chickenDepartment" data-department="chicken"><span>🐔</span><b>BIG ALIEN CHICKEN</b><small>Fresh chicken and homemade products</small><strong>Enter Chicken Shop →</strong></button>
+      <button type="button" class="departmentCard solarDepartment" data-department="solar"><span>☀️</span><b>BIG ALIEN SOLAR</b><small>Homemade solar generators and power solutions</small><strong>Enter Solar Shop →</strong></button>
+      <button type="button" class="departmentCard generalDepartment" data-department="general"><span>🛍️</span><b>GENERAL STORE</b><small>Other products from BIG ALIEN</small><strong>Shop General Products →</strong></button>
+    </section>
+    <div id="departmentShopBar" class="departmentShopBar hidden"><button type="button" class="secondary" id="allDepartmentsBtn">← All Departments</button><b id="departmentShopTitle"></b></div>
+    <div class="sectionHead"><h2 id="shopTitle">Choose a Department</h2><span id="resultCount"></span></div>
     <section id="recommendedProductsSection" class="hidden discoverySection" aria-label="Recommended products"><div class="discoveryHead"><h2>Recommended For You 👽</h2><button type="button" class="discoveryArrow" data-discovery-open="recommended" aria-label="See all recommended products">→</button></div><div id="recommendedProductsGrid" class="discoveryRail"></div></section>
     <section id="recentlyViewedSection" class="hidden discoverySection" aria-label="Recently viewed products"><div class="discoveryHead"><h2>Recently Viewed 👁</h2><button type="button" class="discoveryArrow" data-discovery-open="recent" aria-label="See all recently viewed products">→</button></div><div id="recentlyViewedGrid" class="discoveryRail"></div></section>
     <div id="productGrid" class="grid"></div>
@@ -445,10 +451,11 @@
   <form id="productForm">
     <input type="hidden" id="productId">
     <label>Product name<input id="productName" required></label>
+    <label>Department<select id="productDepartment" required><option value="general">General Store</option><option value="chicken">BIG ALIEN CHICKEN</option><option value="solar">BIG ALIEN SOLAR</option></select></label>
     <label>Category<select id="productCategory"><option>Solar</option><option>Food</option><option>Men</option><option>Clothes</option><option>Shoes</option><option>Electronics</option><option>Other</option></select></label>
     <label>Price (₦)<input id="productPrice" type="number" min="0" required></label>
     <label>Stock<input id="productStock" type="number" min="0" required></label>
-    <label>Description<textarea id="productDescription" placeholder="Product details customers should see"></textarea></label>
+    <label>Full product description<textarea id="productDescription" rows="9" placeholder="Write a complete explanation customers should read before ordering. Include specifications, how it is made, features, limitations and what is included."></textarea></label>
     <label>Available sizes (for clothes/shoes; separate with commas)<input id="productSizes" placeholder="S, M, L, XL, 40, 41, 42"></label>
     <label>Available colors (separate with commas)<input id="productColors" placeholder="Black, White, Blue"></label>
     <label>Product pictures (select multiple pictures for this one product)<input id="productImage" type="file" accept="image/*" multiple></label>

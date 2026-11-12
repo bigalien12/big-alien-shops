@@ -238,3 +238,12 @@ body.dark .checkoutRewardsPanel{background:#172b46;border-color:#35577e;color:#f
   #discoveryPageGrid .cardBody h3 { font-size:13px; }
   #discoveryPageGrid .price { font-size:16px; }
 }
+
+.departmentChooser{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:20px 0}
+.departmentCard{display:flex;flex-direction:column;align-items:flex-start;gap:8px;text-align:left;min-height:175px;padding:18px;border-radius:18px;border:1px solid var(--line);box-shadow:0 4px 16px #1725540c}
+.departmentCard>span{font-size:32px}.departmentCard>b{font-size:18px}.departmentCard small{color:var(--muted);font-weight:500}.departmentCard strong{margin-top:auto}
+.chickenDepartment{background:#fff7ed;border-color:#fed7aa;color:#9a3412}.solarDepartment{background:#eff6ff;border-color:#bfdbfe;color:#075bea}.generalDepartment{background:#f5f3ff;border-color:#ddd6fe;color:#5b21b6}
+.departmentShopBar{display:flex;align-items:center;gap:14px;margin:16px 0}.departmentShopBar b{font-size:19px}
+.productDescription p{white-space:pre-wrap;line-height:1.65}
+body.dark .departmentCard{filter:brightness(.82)}
+@media(max-width:650px){.departmentChooser{grid-template-columns:1fr}.departmentCard{min-height:135px}.departmentShopBar{align-items:flex-start;flex-direction:column}}

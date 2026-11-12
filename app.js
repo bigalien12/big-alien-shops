@@ -10,7 +10,8 @@ let sb = null,
   products = [],
   cart = JSON.parse(localStorage.getItem("big_alien_cart") || "[]"),
   category = "All",
-  query = "";
+  query = "",
+  selectedDepartment = "all";
 const $ = (id) => document.getElementById(id);
 const money = (n) =>
   "₦" + Number(n || 0).toLocaleString("en-NG", { maximumFractionDigits: 0 });
@@ -205,7 +206,8 @@ function imageOrFallback(url) {
   return url || "images/logo.png";
 }
 function renderCats() {
-  let cats = ["All", ...new Set(products.map((p) => p.category))];
+  let departmentProducts = selectedDepartment === "all" ? products : products.filter(p => (p.department || "general") === selectedDepartment);
+  let cats = ["All", ...new Set(departmentProducts.map((p) => p.category))];
   $("categories").innerHTML = cats
     .map(
       (c) =>
@@ -248,8 +250,8 @@ function renderProductDiscovery() {
   const recentSection = $("recentlyViewedSection");
   const recommendedSection = $("recommendedProductsSection");
   if (!recentSection || !recommendedSection) return;
-  const recent = getRecentProductIds().map(productById).filter(Boolean);
-  const suggestions = getRecommendedProducts();
+  const recent = getRecentProductIds().map(productById).filter(p => p && (selectedDepartment === "all" || (p.department || "general") === selectedDepartment));
+  const suggestions = getRecommendedProducts().filter(p => selectedDepartment === "all" || (p.department || "general") === selectedDepartment);
   recentSection.classList.toggle("hidden", !recent.length);
   $("recentlyViewedGrid").innerHTML = recent.slice(0, 8).map(discoveryProductCard).join("");
   recommendedSection.classList.toggle("hidden", !suggestions.length);
@@ -257,7 +259,7 @@ function renderProductDiscovery() {
 }
 function openDiscoveryPage(type) {
   const isRecent = type === "recent";
-  const items = isRecent ? getRecentProductIds().map(productById).filter(Boolean) : getRecommendedProducts();
+  const items = (isRecent ? getRecentProductIds().map(productById).filter(Boolean) : getRecommendedProducts()).filter(p => selectedDepartment === "all" || (p.department || "general") === selectedDepartment);
   $("discoveryPageTitle").textContent = isRecent ? "Recently Viewed 👁" : "Recommended For You 👽";
   $("discoveryPageGrid").innerHTML = items.length ? items.map(discoveryProductCard).join("") : `<div class="summary"><p>No products to show yet.</p></div>`;
   show("discoveryView");
@@ -265,8 +267,16 @@ function openDiscoveryPage(type) {
 }
 
 function renderProducts() {
+  const chooser = $("departmentChooser");
+  const shopBar = $("departmentShopBar");
+  if (chooser) chooser.classList.toggle("hidden", selectedDepartment !== "all");
+  if (shopBar) shopBar.classList.toggle("hidden", selectedDepartment === "all");
+  const deptNames = { all: "Choose a Department", chicken: "🐔 BIG ALIEN CHICKEN", solar: "☀️ BIG ALIEN SOLAR", general: "🛍️ GENERAL STORE" };
+  if ($("shopTitle")) $("shopTitle").textContent = deptNames[selectedDepartment] || "Products";
+  if ($("departmentShopTitle")) $("departmentShopTitle").textContent = deptNames[selectedDepartment] || "Products";
   let list = products.filter(
     (p) =>
+      (selectedDepartment === "all" || (p.department || "general") === selectedDepartment) &&
       (category === "All" || p.category === category) &&
       (!query ||
         `${p.name} ${p.description} ${p.category}`
@@ -1716,6 +1726,7 @@ function openProductModal(p = null) {
   $("productModalTitle").textContent = p ? "Edit Product" : "Add Product";
   $("productId").value = p?.id || "";
   $("productName").value = p?.name || "";
+  $("productDepartment").value = p?.department || "general";
   $("productCategory").value = p?.category || "Solar";
   $("productPrice").value = p?.price || "";
   $("productStock").value = p?.stock ?? 0;
@@ -1747,6 +1758,7 @@ async function saveProduct(e) {
   const parseList = value => [...new Set(String(value || "").split(",").map(x => x.trim()).filter(Boolean))];
   const payload = {
     name: $("productName").value.trim(),
+    department: $("productDepartment").value,
     category: $("productCategory").value,
     price: Number($("productPrice").value),
     stock: Number($("productStock").value),
@@ -2155,6 +2167,25 @@ document.addEventListener("click", async (e) => {
     e.preventDefault();
     show("homeView");
     renderProducts();
+  }
+  if (t.dataset.department) {
+    selectedDepartment = t.dataset.department;
+    category = "All";
+    query = "";
+    if ($("search")) $("search").value = "";
+    renderCats();
+    renderProducts();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
+  if (t.id === "allDepartmentsBtn") {
+    selectedDepartment = "all";
+    category = "All";
+    query = "";
+    if ($("search")) $("search").value = "";
+    renderCats();
+    renderProducts();
+    return;
   }
   if (t.dataset.cat) {
     category = t.dataset.cat;
