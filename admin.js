@@ -22,6 +22,14 @@ const esc = (s) =>
       ])
   );
 const img = (u) => u || "images/logo.png";
+const specialRequestFromNotes = (notes) => {
+  const match = String(notes || "").match(/Customer special request:\s*([\s\S]*?)(?=\n\n|$)/i);
+  return match ? match[1].trim() : "";
+};
+const specialRequestHtml = (order) => {
+  const request = specialRequestFromNotes(order?.notes);
+  return request ? `<div class="summary"><b>Customer special request</b><p style="white-space:pre-wrap">${esc(request)}</p></div>` : "";
+};
 const rewardsInfoHtml = (order) => {
   const points = Math.max(0, Number(order.reward_points_used || 0));
   const discount = Math.max(0, Number(order.reward_discount || 0));
@@ -332,7 +340,7 @@ async function loadOrders() {
   $("adminOrders").innerHTML =
     (data || [])
       .map(
-        (o) => `<div class="orderCard"><b>Order ${o.id.slice(0, 8)}</b> <p>${esc(o.customer_name)} · ${esc(o.customer_phone)} · ${money( o.total )}</p> <p>Payment: <span class="status">${esc( o.payment_status )}</span> · Shipment: <span class="status">${esc(o.order_status)}</span></p> <p>Tracking: ${esc( o.tracking_number || "Not assigned" )}</p><p>Address: ${esc(o.delivery_address)}</p>${rewardsInfoHtml(o)} <button class="primary" data-order="${ o.id }">Manage Order & Shipment</button></div>`
+        (o) => `<div class="orderCard"><b>Order ${o.id.slice(0, 8)}</b> <p>${esc(o.customer_name)} · ${esc(o.customer_phone)} · ${money( o.total )}</p> <p>Payment: <span class="status">${esc( o.payment_status )}</span> · Shipment: <span class="status">${esc(o.order_status)}</span></p> <p>Tracking: ${esc( o.tracking_number || "Not assigned" )}</p><p>Address: ${esc(o.delivery_address)}</p>${specialRequestHtml(o)}${rewardsInfoHtml(o)} <button class="primary" data-order="${ o.id }">Manage Order & Shipment</button></div>`
       )
       .join("") || '<div class="summary">No orders yet.</div>';
 }
@@ -342,10 +350,12 @@ function openProduct(p, defaultDepartment = "general") {
   $("productName").value = p?.name || "";
   $("productDepartment").value = p?.department || defaultDepartment;
   $("productDepartment").disabled = true;
+  $("productPolicyWrap")?.classList.toggle("hidden", !["chicken", "solar"].includes($("productDepartment").value));
   $("productCategory").value = p?.category || "Solar";
   $("productPrice").value = p?.price ?? "";
   $("productStock").value = p?.stock ?? 0;
   $("productDescription").value = p?.description || "";
+  $("productPolicy").value = p?.policy || "";
   $("productSizes").value = Array.isArray(p?.sizes) ? p.sizes.join(", ") : "";
   $("productColors").value = Array.isArray(p?.colors)
     ? p.colors.join(", ")
@@ -409,6 +419,7 @@ async function saveProduct(e) {
     price: Number($("productPrice").value),
     stock: Number($("productStock").value),
     description: $("productDescription").value.trim(),
+    policy: ["chicken", "solar"].includes($("productDepartment").value) ? $("productPolicy").value.trim() : null,
     sizes: parseList($("productSizes").value),
     colors: parseList($("productColors").value),
   };
@@ -458,7 +469,7 @@ async function manageOrder(id) {
     .select("*")
     .eq("order_id", id)
     .order("created_at", { ascending: false });
-  $("orderModalBody").innerHTML = `<h2>Manage Order ${id.slice( 0, 8 )}</h2><p>${esc(o.customer_name)} · ${esc(o.customer_phone)}</p> <p>${esc( o.delivery_address )}</p><h3>Payment & Rewards</h3>${rewardsInfoHtml(o)}<h3>Ordered products</h3>${orderedProductsHtml} <label>Payment status<select id="mPay"><option ${ o.payment_status === "pending" ? "selected" : "" }>pending</option> <option ${ o.payment_status === "paid" ? "selected" : "" }>paid</option><option ${ o.payment_status === "failed" ? "selected" : "" }>failed</option> <option ${ o.payment_status === "refunded" ? "selected" : "" }>refunded</option></select></label> <label>Shipment status<select id="mStatus">${[ "processing", "confirmed", "shipped", "out_for_delivery", "delivered", "cancelled", ] .map( (s) => `<option value="${s}" ${ o.order_status === s ? "selected" : "" }>${s}</option>` ) .join("")}</select></label> <label>Tracking number<input id="mTrack" value="${esc( o.tracking_number || "" )}"></label> <label>Shipment update<textarea id="mMessage" placeholder="e.g. Package has left Abuja sorting centre"></textarea></label> <label>Location<input id="mLocation" placeholder="e.g. Abuja"></label><button class="primary" id="saveOrder">Save Update</button> <h3>Shipment history</h3>${ (ups || []) .map( (u) => `<div class="summary">📍 <b>${esc(u.status)}</b> — ${esc( u.message )}<br><span class="muted">${esc(u.location || "")} ${new Date( u.created_at ).toLocaleString()}</span></div>` ) .join("") || '<p class="muted">No shipment updates yet.</p>' }`;
+  $("orderModalBody").innerHTML = `<h2>Manage Order ${id.slice( 0, 8 )}</h2><p>${esc(o.customer_name)} · ${esc(o.customer_phone)}</p> <p>${esc( o.delivery_address )}</p>${specialRequestHtml(o)}<h3>Payment & Rewards</h3>${rewardsInfoHtml(o)}<h3>Ordered products</h3>${orderedProductsHtml} <label>Payment status<select id="mPay"><option ${ o.payment_status === "pending" ? "selected" : "" }>pending</option> <option ${ o.payment_status === "paid" ? "selected" : "" }>paid</option><option ${ o.payment_status === "failed" ? "selected" : "" }>failed</option> <option ${ o.payment_status === "refunded" ? "selected" : "" }>refunded</option></select></label> <label>Shipment status<select id="mStatus">${[ "processing", "confirmed", "shipped", "out_for_delivery", "delivered", "cancelled", ] .map( (s) => `<option value="${s}" ${ o.order_status === s ? "selected" : "" }>${s}</option>` ) .join("")}</select></label> <label>Tracking number<input id="mTrack" value="${esc( o.tracking_number || "" )}"></label> <label>Shipment update<textarea id="mMessage" placeholder="e.g. Package has left Abuja sorting centre"></textarea></label> <label>Location<input id="mLocation" placeholder="e.g. Abuja"></label><button class="primary" id="saveOrder">Save Update</button> <h3>Shipment history</h3>${ (ups || []) .map( (u) => `<div class="summary">📍 <b>${esc(u.status)}</b> — ${esc( u.message )}<br><span class="muted">${esc(u.location || "")} ${new Date( u.created_at ).toLocaleString()}</span></div>` ) .join("") || '<p class="muted">No shipment updates yet.</p>' }`;
   $("saveOrder").onclick = async () => {
     const { error } = await sb
       .from("orders")

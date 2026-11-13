@@ -142,7 +142,10 @@ function show(id, remember = true) {
       );
     });
   }
-  if (id === "checkoutView") loadCheckoutRewards();
+  if (id === "checkoutView") {
+    syncDepartmentSpecialRequest();
+    loadCheckoutRewards();
+  }
 }
 function msg(id, t, ok = false) {
   $(id).textContent = t;
@@ -385,6 +388,11 @@ function openProduct(id) {
           <h3>Product details</h3>
           <p>${esc(p.description || "Contact us on WhatsApp if you need more information about this product.")}</p>
         </div>
+        ${["chicken", "solar"].includes(p.department) && p.policy ? `
+          <section class="productDescription departmentProductPolicy">
+            <h3>Important product information &amp; usage policy</h3>
+            <p>${esc(p.policy).replace(/\n/g, "<br>")}</p>
+          </section>` : ""}
 
         ${missingVariantSetup ? `
           <div class="productSetupNotice">Size and color options are not yet configured for this item. Please contact the store before ordering.</div>
@@ -587,7 +595,28 @@ function addCart(p, q, variants = {}) {
   saveCart();
   renderCart();
 }
+function cartHasChickenOrSolar() {
+  return cart.some((item) => {
+    const product = productById(item.id);
+    return ["chicken", "solar"].includes(product?.department || item.department);
+  });
+}
+function syncDepartmentSpecialRequest() {
+  const wrap = $("departmentSpecialRequestWrap");
+  if (!wrap) return;
+  const visible = cartHasChickenOrSolar();
+  wrap.classList.toggle("hidden", !visible);
+  const field = $("departmentSpecialRequest");
+  if (field) { field.required = false; if (!visible) field.value = ""; }
+}
+function buildOrderNotes(paymentStatusText) {
+  const email = $("coEmail")?.value.trim() || "";
+  const request = cartHasChickenOrSolar() ? $("departmentSpecialRequest")?.value.trim() || "" : "";
+  return `Contact email for this order: ${email}.${request ? `\n\nCustomer special request:\n${request}\n\n` : " "}${paymentStatusText}`;
+}
+
 function renderCart() {
+  syncDepartmentSpecialRequest();
   if (!cart.length) {
     $("cartItems").innerHTML = `<div class="summary"><h3>Your cart is empty.</h3></div>`;
     $("cartSummary").innerHTML = "";
@@ -616,6 +645,7 @@ $("cartSummary").innerHTML = `
   Proceed to Checkout
 </button>
 `;  saveCart();
+  syncDepartmentSpecialRequest();
 }
 function checkoutReportKey() {
   const cartKey = cart
@@ -1074,7 +1104,7 @@ async function startPaystackCheckout() {
     payment_method: "paystack", payment_status: "pending", order_status: "processing",
     customer_name: $("coName").value.trim(), customer_phone: $("coPhone").value.trim(),
     delivery_address: $("coAddress").value.trim(),
-    notes: `Contact email for this order: ${$("coEmail").value.trim()}. Awaiting Paystack payment verification.`,
+    notes: buildOrderNotes("Awaiting Paystack payment verification."),
   };
   let order;
   try {
@@ -1161,7 +1191,7 @@ async function submitOrder(e) {
     customer_name: $("coName").value.trim(),
     customer_phone: $("coPhone").value.trim(),
     delivery_address: $("coAddress").value.trim(),
-    notes: `Contact email for this order: ${$("coEmail").value.trim()}. Customer reported payment; awaiting admin verification.`,
+    notes: buildOrderNotes("Customer reported payment; awaiting admin verification."),
   };  const { data: o, error } = await sb
     .from("orders")
     .insert(payload)
