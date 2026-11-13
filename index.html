@@ -126,6 +126,15 @@
     <div id="productGrid" class="grid"></div>
   </section>
 
+  <section id="chickenShopView" class="departmentShopPage chickenShopPage hidden">
+    <div class="departmentShopHero"><button type="button" class="departmentBack" data-back-departments>← All Departments</button><div class="departmentShopEyebrow">🐔 BIG ALIEN VENTURE</div><h1>BIG ALIEN CHICKEN</h1><p>Fresh chicken and homemade products, prepared with care.</p><a href="https://wa.me/2347025136166" class="departmentContact">Ask us on WhatsApp</a></div>
+    <div class="departmentShopToolbar"><h2>Explore Chicken</h2><span id="chickenCount"></span></div><div id="chickenCategories" class="departmentCategoryRail"></div><div id="chickenProducts" class="grid"></div>
+  </section>
+  <section id="solarShopView" class="departmentShopPage solarShopPage hidden">
+    <div class="departmentShopHero"><button type="button" class="departmentBack" data-back-departments>← All Departments</button><div class="departmentShopEyebrow">☀️ BIG ALIEN VENTURE</div><h1>BIG ALIEN SOLAR</h1><p>Homemade solar generators and dependable power solutions.</p><a href="https://wa.me/2347025136166" class="departmentContact">Ask us on WhatsApp</a></div>
+    <div class="departmentShopToolbar"><h2>Explore Solar</h2><span id="solarCount"></span></div><div id="solarCategories" class="departmentCategoryRail"></div><div id="solarProducts" class="grid"></div>
+  </section>
+
   <section id="discoveryView" class="hidden">
     <div class="discoveryPageHead"><button type="button" class="secondary" id="discoveryBackBtn">← Back to marketplace</button><h2 id="discoveryPageTitle">Discover products</h2></div>
     <div id="discoveryPageGrid" class="grid"></div>
@@ -478,7 +487,7 @@
 <footer>© Big Alien Venture 👽 · Customer service 07025136166</footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="app.js?v=14"></script>
+<script src="app.js?v=15"></script>
 <script>
   document.querySelectorAll('.passwordToggle[data-password-target]').forEach(function(button){
     button.addEventListener('click', function(){

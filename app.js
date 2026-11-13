@@ -28,6 +28,8 @@ function saveCart() {
   $("cartCount").textContent = cart.reduce((a, x) => a + x.qty, 0);
 }
 let currentView = null;
+let productReturnView = "homeView";
+const departmentCategory = { chicken: "All", solar: "All" };
 const viewHistory = [];
 let customerOrdersCache = [];
 let customerOrderItemsCache = {};
@@ -87,6 +89,8 @@ function show(id, remember = true) {
     "authView",
     "otpView",
     "homeView",
+    "chickenShopView",
+    "solarShopView",
     "discoveryView",
     "productView",
     "cartView",
@@ -266,6 +270,21 @@ function openDiscoveryPage(type) {
   window.scrollTo({top:0, behavior:"auto"});
 }
 
+function renderDepartmentShop(dept) {
+  const isChicken = dept === "chicken";
+  const host = $(isChicken ? "chickenProducts" : "solarProducts");
+  const catsHost = $(isChicken ? "chickenCategories" : "solarCategories");
+  const count = $(isChicken ? "chickenCount" : "solarCount");
+  if (!host || !catsHost) return;
+  const rows = products.filter(p => (p.department || "general") === dept);
+  const cats = ["All", ...new Set(rows.map(p => p.category).filter(Boolean))];
+  if (!cats.includes(departmentCategory[dept])) departmentCategory[dept] = "All";
+  catsHost.innerHTML = cats.map(c => `<button type="button" class="${departmentCategory[dept] === c ? "active" : ""}" data-shop-dept="${dept}" data-shop-cat="${esc(c)}">${esc(c)}</button>`).join("");
+  const filtered = rows.filter(p => departmentCategory[dept] === "All" || p.category === departmentCategory[dept]);
+  count.textContent = `${filtered.length} product(s)`;
+  host.innerHTML = filtered.length ? filtered.map(p => `<article class="card"><button class="departmentProductImage" type="button" data-product="${esc(p.id)}"><img src="${esc(imageOrFallback(p.image_url))}" alt="${esc(p.name)}" loading="lazy"></button><div class="cardBody"><div class="muted">${esc(p.category || (isChicken ? "Chicken" : "Solar"))}</div><h3>${esc(p.name)}</h3><p class="departmentCardDescription">${esc(p.description || "")}</p><div class="price">${money(p.price)}</div><div class="stockBadge ${productStock(p)>0?"inStock":"outStock"}">${productStock(p)>0?"● In Stock":"Out of Stock"}</div><button class="primary" type="button" data-product="${esc(p.id)}" ${productStock(p)<1?"disabled":""}>View Details</button></div></article>`).join("") : `<div class="summary"><h3>No ${isChicken?"chicken":"solar"} products available yet</h3><p>New products will appear here when the store owner adds them.</p></div>`;
+}
+
 function renderProducts() {
   const chooser = $("departmentChooser");
   const shopBar = $("departmentShopBar");
@@ -335,6 +354,7 @@ function openProduct(id) {
   const missingVariantSetup = variants && (!sizes.length || !colors.length);
   const inStock = productStock(p) > 0;
 
+  productReturnView = currentView === "chickenShopView" || currentView === "solarShopView" ? currentView : "homeView";
   show("productView");
   $("productView").innerHTML = `
     <button class="secondary productBackButton" id="productBackBtn" type="button">← Back to products</button>
@@ -408,8 +428,10 @@ function openProduct(id) {
   loadProductReviews(p.id);
 
   $("productBackBtn").onclick = () => {
-    show("homeView");
-    renderProducts();
+    show(productReturnView);
+    if (productReturnView === "chickenShopView") renderDepartmentShop("chicken");
+    else if (productReturnView === "solarShopView") renderDepartmentShop("solar");
+    else renderProducts();
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -2169,14 +2191,28 @@ document.addEventListener("click", async (e) => {
     renderProducts();
   }
   if (t.dataset.department) {
-    selectedDepartment = t.dataset.department;
-    category = "All";
-    query = "";
-    if ($("search")) $("search").value = "";
-    renderCats();
-    renderProducts();
+    const dept = t.dataset.department;
+    category = "All"; query = "";
+    if (dept === "chicken" || dept === "solar") {
+      departmentCategory[dept] = "All";
+      show(dept === "chicken" ? "chickenShopView" : "solarShopView");
+      renderDepartmentShop(dept);
+    } else {
+      selectedDepartment = "general";
+      renderCats(); renderProducts();
+    }
     window.scrollTo({ top: 0, behavior: "smooth" });
     return;
+  }
+  if (t.hasAttribute("data-back-departments")) {
+    selectedDepartment = "all"; category = "All"; query = "";
+    show("homeView"); renderCats(); renderProducts();
+    window.scrollTo({top:0,behavior:"smooth"}); return;
+  }
+  if (t.dataset.shopCat) {
+    const dept = t.dataset.shopDept;
+    departmentCategory[dept] = t.dataset.shopCat;
+    renderDepartmentShop(dept); return;
   }
   if (t.id === "allDepartmentsBtn") {
     selectedDepartment = "all";

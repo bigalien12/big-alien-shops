@@ -9,7 +9,7 @@ const sb = ready
   : null;
 let adminUser = null;
 let adminProductsCache = [];
-let adminDepartmentFilter = "all";
+let adminDepartmentFilter = "general";
 const $ = (id) => document.getElementById(id);
 const money = (n) =>
   "₦" + Number(n || 0).toLocaleString("en-NG", { maximumFractionDigits: 0 });
@@ -299,26 +299,25 @@ async function markNotificationRead(id) {
   await loadNotifications();
 }
 async function loadProducts() {
-  const { data, error } = await sb
-    .from("products")
-    .select("*")
-    .order("created_at", { ascending: false });
+  const { data, error } = await sb.from("products").select("*").order("created_at", { ascending: false });
   if (error) {
-    $("adminProducts").innerHTML =
-      '<div class="summary">' + esc(error.message) + "</div>";
+    ["adminProducts", "adminChickenProducts", "adminSolarProducts"].forEach(id => { if ($(id)) $(id).innerHTML = `<div class="summary">${esc(error.message)}</div>`; });
     return;
   }
   adminProductsCache = data || [];
   renderAdminProducts();
 }
+function renderAdminProductList(department, targetId) {
+  const host = $(targetId); if (!host) return;
+  const rows = adminProductsCache.filter(p => (p.department || "general") === department).map(p =>
+    `<div class="adminRow"><img src="${esc(img(p.image_url))}" alt=""><div><b>${esc(p.name)}</b><div class="muted">${esc(p.category || "")}</div></div><div>${money(p.price)}</div><div>${p.stock}</div><div>${p.active ? "Live" : "Hidden"}</div><div><button class="secondary" data-edit="${p.id}">Edit</button> <button class="danger" data-delete="${p.id}">Delete</button></div></div>`
+  ).join("");
+  host.innerHTML = `<div class="adminTable"><div class="adminRow"><b>Image</b><b>Product</b><b>Price</b><b>Stock</b><b>Status</b><b>Actions</b></div>${rows || '<div class="summary">No products in this department yet.</div>'}</div>`;
+}
 function renderAdminProducts() {
-  const rows = adminProductsCache
-    .filter(p => adminDepartmentFilter === "all" || (p.department || "general") === adminDepartmentFilter)
-    .map(
-      (p) => `<div class="adminRow"><img src="${esc(img(p.image_url))}" alt=""> <div><b>${esc(p.name)}</b><div class="muted">${esc(p.department || "general")} · ${esc(p.category)}</div></div><div>${money(p.price)}</div> <div>${p.stock}</div><div>${p.active ? "Live" : "Hidden"}</div> <div><button class="secondary" data-edit="${p.id}">Edit</button> <button class="danger" data-delete="${p.id}">Delete</button></div></div>`
-    )
-    .join("");
-  $("adminProducts").innerHTML = `<div class="adminTable"><div class="adminRow"><b>Image</b><b>Product</b><b>Price</b><b>Stock</b><b>Status</b><b>Actions</b></div>${rows || '<div class="summary">No products in this department yet.</div>'}</div>`;
+  renderAdminProductList("general", "adminProducts");
+  renderAdminProductList("chicken", "adminChickenProducts");
+  renderAdminProductList("solar", "adminSolarProducts");
 }
 async function loadOrders() {
   const { data, error } = await sb
@@ -337,11 +336,12 @@ async function loadOrders() {
       )
       .join("") || '<div class="summary">No orders yet.</div>';
 }
-function openProduct(p) {
+function openProduct(p, defaultDepartment = "general") {
   $("productModalTitle").textContent = p ? "Edit Product" : "Add Product";
   $("productId").value = p?.id || "";
   $("productName").value = p?.name || "";
-  $("productDepartment").value = p?.department || "general";
+  $("productDepartment").value = p?.department || defaultDepartment;
+  $("productDepartment").disabled = true;
   $("productCategory").value = p?.category || "Solar";
   $("productPrice").value = p?.price ?? "";
   $("productStock").value = p?.stock ?? 0;
@@ -523,17 +523,13 @@ document.addEventListener("click", async (e) => {
     await markNotificationRead(t.dataset.readNotification);
     return;
   }
-  if (t.dataset.adminDepartment) {
-    adminDepartmentFilter = t.dataset.adminDepartment;
-    document.querySelectorAll("[data-admin-department]").forEach(x => x.classList.toggle("active", x === t));
-    renderAdminProducts();
-    return;
-  }
   if (t.dataset.tab) {
     document
       .querySelectorAll("[data-tab]")
       .forEach((x) => x.classList.toggle("active", x === t));
     $("productsTab").classList.toggle("hidden", t.dataset.tab !== "products");
+    $("chickenTab").classList.toggle("hidden", t.dataset.tab !== "chicken");
+    $("solarTab").classList.toggle("hidden", t.dataset.tab !== "solar");
     $("ordersTab").classList.toggle("hidden", t.dataset.tab !== "orders");
     $("reviewsTab").classList.toggle("hidden", t.dataset.tab !== "reviews");
     $("rewardsTab").classList.toggle("hidden", t.dataset.tab !== "rewards");
@@ -544,7 +540,9 @@ document.addEventListener("click", async (e) => {
   }
   if (t.dataset.reviewApprove) await moderateReview(t.dataset.reviewApprove, "approved");
   if (t.dataset.reviewReject) await moderateReview(t.dataset.reviewReject, "rejected");
-  if (t.id === "addProductBtn") openProduct();
+  if (t.id === "addGeneralProductBtn") openProduct(null, "general");
+  if (t.id === "addChickenProductBtn") openProduct(null, "chicken");
+  if (t.id === "addSolarProductBtn") openProduct(null, "solar");
   if (t.dataset.edit) {
     const { data } = await sb
       .from("products")

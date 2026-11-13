@@ -47,18 +47,23 @@
   <section id="adminLogin" class="summary hidden"><h2>Owner / Admin Login</h2><p>Sign in with your authorized Big Alien administrator account.</p><form id="adminLoginForm" class="checkout"><label>Email<input id="adminLoginEmail" type="email" autocomplete="username" required></label><label>Password<input id="adminLoginPassword" type="password" autocomplete="current-password" required></label><button class="primary" type="submit">Sign in to Admin</button><p id="adminLoginMsg" class="msg" aria-live="polite"></p></form><button class="secondary" id="deniedLogin" type="button">← Back to Store</button></section>
   <section id="denied" class="summary hidden"><h2>Admin access required</h2><p>This account is signed in but does not have the admin role. Ask the store owner to authorize it.</p><button class="secondary" id="deniedLoginAgain" type="button">Use another account</button></section>
   <section id="adminApp" class="hidden">
-    <div class="adminTitle"><div><h1>👑 Owner Dashboard</h1><p>Manage products, orders, payments and shipment updates.</p></div><button class="primary" id="addProductBtn">➕ Add Product</button></div>
+    <div class="adminTitle"><div><h1>👑 Owner Dashboard</h1><p>Manage products, orders, payments and shipment updates.</p></div></div>
     <section id="adminMessagesPanel" class="notificationPanel hidden" aria-labelledby="adminMessagesTitle"><div class="notificationPanelHead"><h2 id="adminMessagesTitle">Admin Notifications</h2><button class="secondary" id="refreshAdminMessages" type="button">Refresh</button></div><div id="adminMessages"><p class="notificationEmpty">New orders and customer payment reports will appear here.</p></div></section>
-    <div class="adminTabs"><button class="active" data-tab="products">Products</button><button data-tab="orders">Orders & Shipment</button><button data-tab="reviews">Customer Reviews</button><button data-tab="rewards">Customer Rewards</button><button data-tab="analytics">📊 Sales Analytics</button></div>
+    <div class="adminTabs"><button class="active" data-tab="products">General Products</button><button data-tab="chicken">🐔 Chicken Shop</button><button data-tab="solar">☀️ Solar Shop</button><button data-tab="orders">Orders & Shipment</button><button data-tab="reviews">Customer Reviews</button><button data-tab="rewards">Customer Rewards</button><button data-tab="analytics">📊 Sales Analytics</button></div>
     <section id="productsTab">
-      <div class="departmentAdminFilters" aria-label="Filter products by department">
-        <button type="button" class="active" data-admin-department="all">All Products</button>
-        <button type="button" data-admin-department="chicken">🐔 Chicken</button>
-        <button type="button" data-admin-department="solar">☀️ Solar</button>
-        <button type="button" data-admin-department="general">General Store</button>
-      </div>
-      <p class="small muted">Manage all departments from this one owner account. Choose a department when adding or editing a product.</p>
+      <div class="departmentAdminIntro generalAdminIntro"><h2>🛍️ General Store Products</h2><p>Manage the regular BIG ALIEN marketplace products here. Chicken and Solar have their own management pages.</p></div>
+      <div class="adminActions"><button class="primary" type="button" id="addGeneralProductBtn">➕ Add General Product</button></div>
       <div id="adminProducts"></div>
+    </section>
+    <section id="chickenTab" class="hidden">
+      <div class="departmentAdminIntro chickenAdminIntro"><span>🐔 BIG ALIEN CHICKEN</span><h2>Chicken Department Management</h2><p>Add homemade chicken products, write full descriptions, update prices and stock, or remove products.</p></div>
+      <div class="adminActions"><button class="primary" type="button" id="addChickenProductBtn">➕ Add Chicken Product</button></div>
+      <div id="adminChickenProducts"></div>
+    </section>
+    <section id="solarTab" class="hidden">
+      <div class="departmentAdminIntro solarAdminIntro"><span>☀️ BIG ALIEN SOLAR</span><h2>Solar Department Management</h2><p>Describe how each homemade generator is built, its battery, inverter, output, panels, features and what's included.</p></div>
+      <div class="adminActions"><button class="primary" type="button" id="addSolarProductBtn">➕ Add Solar Product</button></div>
+      <div id="adminSolarProducts"></div>
     </section>
     <section id="ordersTab" class="hidden"><div id="adminOrders"></div></section>
     <section id="reviewsTab" class="hidden"><div id="adminReviews"></div></section>
@@ -71,7 +76,7 @@
 <footer>© Big Alien Venture 👽 · Admin dashboard</footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="admin.js?v=7"></script>
+<script src="admin.js?v=9"></script>
   <script type="module" src="notifications.js"></script>
 </body>
 </html>
