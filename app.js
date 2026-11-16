@@ -674,7 +674,7 @@ function renderCart() {
     return `<div class="cartRow"><img src="${esc(imageOrFallback(item.image_url))}" alt="${esc(item.name)}"><div class="cartProductInfo" style="flex:1;min-width:100px"><b>${esc(item.name)}</b>${item.size ? `<div>Size: ${esc(item.size)}</div>` : ""}${item.color ? `<div>Color: ${esc(item.color)}</div>` : ""}<div>${money(item.price)} × ${qty}</div><small class="muted">${stock} available</small></div><button class="secondary" type="button" data-minus="${esc(item.id)}" data-size="${esc(item.size || "")}" data-color="${esc(item.color || "")}" aria-label="Decrease ${esc(item.name)} quantity" ${qty <= 1 ? "disabled" : ""}>−</button><b aria-label="Quantity">${qty}</b><button class="secondary" type="button" data-plus="${esc(item.id)}" data-size="${esc(item.size || "")}" data-color="${esc(item.color || "")}" aria-label="Increase ${esc(item.name)} quantity" ${stock <= qty ? "" : ""}>+</button><button class="danger" type="button" data-remove="${esc(item.id)}" data-size="${esc(item.size || "")}" data-color="${esc(item.color || "")}">Remove</button></div>`;
   }).join("");
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
-const shippingFee = 3000;
+const shippingFee = 1800;
 const total = subtotal + shippingFee;
 
 $("cartSummary").innerHTML = `
@@ -1079,7 +1079,7 @@ function checkoutRewardChoice() {
 }
 function checkoutAmounts() {
   const subtotal = cart.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.qty || 0), 0);
-  const shippingFee = 3000;
+  const shippingFee = 1800;
   const reward = checkoutRewardChoice();
   const discount = Math.min(reward.discount, subtotal + shippingFee);
   return { subtotal, shippingFee, discount, rewardPoints: discount ? reward.points : 0, total: Math.max(0, subtotal + shippingFee - discount) };
