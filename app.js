@@ -39,7 +39,9 @@ let checkoutRewardLoading = false;
 function show(id, remember = true) {
   // A deliberate return to the marketplace starts a fresh customer navigation path.
   if (id === "homeView" && remember) viewHistory.length = 0;
-  if (remember && currentView && currentView !== id) {
+  // The marketplace is the root screen: never put login/authentication in the
+  // in-app Back stack when a customer returns home after signing in.
+  if (remember && id !== "homeView" && currentView && currentView !== id) {
     viewHistory.push(currentView);
     // Keep history bounded during long shopping sessions.
     if (viewHistory.length > 50) viewHistory.shift();
@@ -2179,9 +2181,52 @@ function restorePreviousAppView(targetView) {
   }
 }
 
-// Native browser Back (Android hardware/browser button and iPhone Safari
-// swipe-back) now follows the same screen history as the in-app Back button.
+// At the marketplace root, the phone's Back control should offer a clear
+// exit warning instead of returning the customer to the login screen.
+let exitBackArmed = false;
+let exitBackResetTimer = null;
+function showExitWarning() {
+  let notice = document.getElementById("bavExitWarning");
+  if (!notice) {
+    notice = document.createElement("div");
+    notice.id = "bavExitWarning";
+    notice.textContent = "You're about to leave BIG ALIEN VENTURE. Press Back again to exit!";
+    Object.assign(notice.style, {
+      position: "fixed", left: "50%", bottom: "90px", transform: "translateX(-50%)",
+      zIndex: "99999", width: "max-content", maxWidth: "90vw", boxSizing: "border-box",
+      padding: "14px 18px", borderRadius: "8px", background: "rgba(20,20,20,.94)",
+      color: "#fff", fontSize: "14px", lineHeight: "1.4", textAlign: "center",
+      boxShadow: "0 3px 14px rgba(0,0,0,.25)"
+    });
+    document.body.appendChild(notice);
+  }
+  notice.style.display = "block";
+  clearTimeout(exitBackResetTimer);
+  exitBackResetTimer = setTimeout(() => {
+    notice.style.display = "none";
+    exitBackArmed = false;
+  }, 2200);
+}
+
 window.addEventListener("popstate", (event) => {
+  // Once the customer is at Home, do not restore authView. First Back shows
+  // the warning; a second Back within the short window leaves the app.
+  if (currentView === "homeView" && viewHistory.length === 0) {
+    if (!exitBackArmed) {
+      exitBackArmed = true;
+      try { window.history.pushState({ bavView: "homeView", bavExitGuard: true }, "", window.location.href); } catch (_) {}
+      showExitWarning();
+      return;
+    }
+    exitBackArmed = false;
+    clearTimeout(exitBackResetTimer);
+    // Skip the old auth entry so Back exits the storefront, not the login page.
+    window.history.go(-1);
+    return;
+  }
+
+  exitBackArmed = false;
+  clearTimeout(exitBackResetTimer);
   const previousView = viewHistory.pop();
   const targetView = event.state?.bavView || previousView || (user ? "homeView" : "authView");
   restorePreviousAppView(targetView);
