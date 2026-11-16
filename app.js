@@ -46,6 +46,15 @@ function show(id, remember = true) {
   }
   currentView = id;
 
+  // Mirror the app's screen stack in the browser history so the phone's
+  // Back button / Safari swipe-back returns to the previous app screen.
+  // A popstate restoration replaces the current entry instead of adding one.
+  try {
+    const state = { ...(window.history.state || {}), bavView: id };
+    if (remember) window.history.pushState(state, "", window.location.href);
+    else window.history.replaceState(state, "", window.location.href);
+  } catch (_) {}
+
   // Remember the last customer screen in this browser tab so returning from
   // another app (or a tab reload) restores the same section.
   try {
@@ -2143,21 +2152,50 @@ document.querySelectorAll("[data-ai-prompt]").forEach(button => {
   });
 }
 
+function restorePreviousAppView(targetView) {
+  const allowedViews = [
+    "authView", "otpView", "homeView", "chickenShopView", "solarShopView",
+    "discoveryView", "productView", "cartView", "checkoutView", "ordersView",
+    "wishlistView", "profileView", "customerInboxView", "accountManagementView",
+    "personalDetailsView", "deliveryAddressView", "emailSettingsView",
+    "passwordSettingsView", "reviewsView", "rewardsView", "supportView",
+    "deleteAccountView", "adminView"
+  ];
+  if (!allowedViews.includes(targetView)) {
+    targetView = user ? "homeView" : "authView";
+  }
+  show(targetView, false);
+  window.scrollTo({ top: 0, behavior: "auto" });
+
+  if (targetView === "homeView") renderProducts();
+  if (targetView === "cartView") renderCart();
+  if (targetView === "wishlistView") renderWishlist();
+  if (targetView === "ordersView") openOrders();
+  if (["profileView", "accountManagementView", "personalDetailsView", "deliveryAddressView"].includes(targetView)) loadProfile();
+  if (targetView === "rewardsView") loadCustomerRewards();
+  if (targetView === "customerInboxView") {
+    loadCustomerNotifications();
+    loadCustomerInbox();
+  }
+}
+
+// Native browser Back (Android hardware/browser button and iPhone Safari
+// swipe-back) now follows the same screen history as the in-app Back button.
+window.addEventListener("popstate", (event) => {
+  const previousView = viewHistory.pop();
+  const targetView = event.state?.bavView || previousView || (user ? "homeView" : "authView");
+  restorePreviousAppView(targetView);
+});
+
 const pageBackBtn = $("pageBackBtn");
 if (pageBackBtn) {
   pageBackBtn.addEventListener("click", () => {
+    if (window.history.state?.bavView && viewHistory.length) {
+      window.history.back();
+      return;
+    }
     const previousView = viewHistory.pop();
-    const targetView =
-      previousView ||
-      (user ? "homeView" : "authView");
-    show(targetView, false);
-    window.scrollTo({ top: 0, behavior: "auto" });
-
-    if (targetView === "homeView") renderProducts();
-    if (targetView === "cartView") renderCart();
-    if (targetView === "wishlistView") renderWishlist();
-    if (targetView === "ordersView") openOrders();
-    if (targetView === "profileView") loadProfile();
+    restorePreviousAppView(previousView || (user ? "homeView" : "authView"));
   });
 }
 
