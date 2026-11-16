@@ -1288,13 +1288,31 @@ async function submitOrder(e) {
   );
   setTimeout(() => openOrders(), 600);
 }
+function ensureDeliveredOrderStyles() {
+  if ($("deliveredOrderStyles")) return;
+  const style = document.createElement("style");
+  style.id = "deliveredOrderStyles";
+  style.textContent = `
+    .deliveredConfirmation{display:flex;align-items:center;gap:14px;margin:16px 0;padding:18px 16px;border-radius:16px;background:#eaf8ee;border:1px solid #c8ecd2;color:#14532d}
+    .deliveredCheck{display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;border-radius:50%;background:#16a34a;color:#fff;font-size:30px;font-weight:900}
+    .deliveredConfirmation b{display:block;font-size:21px;font-weight:850}
+    .deliveredConfirmation p{margin:4px 0 0;color:#245b36;line-height:1.45}
+    .deliveredOrderBadge{background:#e7f7ec!important;color:#16803d!important}
+    .deliveredAddress,.deliveredOrderSummary{margin-top:16px;padding-top:14px;border-top:1px solid var(--border,#dce4ef)}
+    .deliveredAddress h4,.deliveredOrderSummary h4{margin:0 0 10px;font-size:16px}
+    .deliveredAddress p{margin:0;line-height:1.55;overflow-wrap:anywhere}
+    .deliveredOrderSummary>div{display:flex;justify-content:space-between;gap:12px;padding:8px 0}
+    .deliveredOrderSummary .deliveredTotal{margin-top:6px;padding:13px 12px;border-radius:10px;background:#e8f1ff;color:#172033;font-weight:800}
+    body.dark .deliveredConfirmation{background:#123522;border-color:#245b3b;color:#dcfce7}
+    body.dark .deliveredConfirmation p{color:#c4f1d0}
+    body.dark .deliveredOrderSummary .deliveredTotal{background:#1b3558;color:#f1f5fb}
+  `;
+  document.head.appendChild(style);
+}
+
 function orderTrackingStage(order, updates) {
   const latest = updates?.[0] || null;
-  // Supabase stores statuses such as "out_for_delivery"; normalize separators
-  // before matching so the timeline advances for both underscore and space forms.
-  const current = `${order.order_status || ""} ${latest?.status || ""} ${latest?.message || ""}`
-    .toLowerCase()
-    .replace(/[_-]+/g, " ");
+  const current = `${order.order_status || ""} ${latest?.status || ""} ${latest?.message || ""}`.toLowerCase();
   if (/cancel|refund|return/.test(current)) return { terminal: true, label: "Cancelled / Returned", index: -1 };
   if (/delivered|successfully received|order complete/.test(current)) return { terminal: false, label: "Delivered", index: 4 };
   if (/ready for pickup|available for pickup|at pickup point|arrived at pickup/.test(current)) return { terminal: false, label: "Ready for pickup", index: 3 };
@@ -1340,65 +1358,34 @@ function refreshCustomerReturnCountdowns() {
   });
 }
 
-function validShipmentCoordinates(update) {
-  const lat = Number(update?.latitude), lng = Number(update?.longitude);
-  return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && update?.latitude !== null && update?.longitude !== null && update?.latitude !== "" && update?.longitude !== "";
-}
-
-function customerTrackingLink(order, updates = []) {
+function customerTrackingLink(order) {
   const number = order.tracking_number || "Not assigned yet";
-  if (!order.tracking_number) return esc(number);
-  const mapUpdate = updates.find(validShipmentCoordinates);
-  const mapLink = mapUpdate
-    ? `<a class="customerTrackingMapLink" href="#delivery-map" data-open-delivery-map data-map-lat="${Number(mapUpdate.latitude)}" data-map-lng="${Number(mapUpdate.longitude)}" data-map-location="${esc(mapUpdate.location || "Confirmed delivery location")}">${esc(number)} ↗</a>`
-    : esc(number);
-  let carrierLink = "";
-  if (order.tracking_url) {
-    try {
-      const url = new URL(order.tracking_url);
-      if (["http:", "https:"].includes(url.protocol)) carrierLink = ` <a class="carrierTrackingLink" href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">Carrier tracking ↗</a>`;
-    } catch (_) {}
+  if (!order.tracking_url) return esc(number);
+  try {
+    const url = new URL(order.tracking_url);
+    if (!["http:", "https:"].includes(url.protocol)) return esc(number);
+    return `<a href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">${esc(number)} ↗</a>`;
+  } catch (_) {
+    return esc(number);
   }
-  return mapLink + carrierLink;
 }
 
-let customerDeliveryMap = null;
-function closeCustomerDeliveryMap() {
-  const modal = document.getElementById("customerDeliveryMapModal");
-  if (customerDeliveryMap) { customerDeliveryMap.remove(); customerDeliveryMap = null; }
-  if (modal) modal.classList.add("hidden");
+function shipmentMapMarkup(update, index) {
+  const lat = Number(update.latitude), lng = Number(update.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return "";
+  return `<div class="customerShipmentMapWrap"><b>📍 Confirmed delivery location</b><div id="customerShipmentMap${index}" class="baShipmentMap customerShipmentMap" data-map-lat="${lat}" data-map-lng="${lng}"></div><small class="muted">Location manually confirmed by BIG ALIEN</small><a href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}" target="_blank" rel="noopener noreferrer">Open larger map ↗</a></div>`;
 }
 
-function openCustomerDeliveryMap(lat, lng, location) {
-  if (!window.L) return alert("The map could not load. Please check your internet connection and try again.");
-  let modal = document.getElementById("customerDeliveryMapModal");
-  if (!modal) {
-    modal = document.createElement("div");
-    modal.id = "customerDeliveryMapModal";
-    modal.className = "customerDeliveryMapModal hidden";
-    modal.innerHTML = `<section class="customerDeliveryMapCard" role="dialog" aria-modal="true" aria-labelledby="customerDeliveryMapTitle"><header><div><b id="customerDeliveryMapTitle">📍 Delivery Location</b><small>Location confirmed by BIG ALIEN</small></div><button type="button" data-close-delivery-map aria-label="Close map">×</button></header><div id="customerDeliveryMapCanvas"></div><div class="customerDeliveryMapFooter"><b id="customerDeliveryMapLocation"></b><button type="button" class="primary" data-close-delivery-map>Close Map</button></div></section>`;
-    document.body.appendChild(modal);
-    const style = document.createElement("style");
-    style.id = "customerDeliveryMapStyles";
-    style.textContent = `.customerDeliveryMapModal{position:fixed;inset:0;z-index:10050;background:#071426b8;display:flex;align-items:center;justify-content:center;padding:16px}.customerDeliveryMapModal.hidden{display:none}.customerDeliveryMapCard{width:min(720px,100%);max-height:92dvh;overflow:auto;background:var(--card,#fff);color:var(--ink,#172033);border-radius:18px;box-shadow:0 18px 60px #0005}.customerDeliveryMapCard>header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;background:#073b83;color:#fff}.customerDeliveryMapCard>header b,.customerDeliveryMapCard>header small{display:block}.customerDeliveryMapCard>header small{opacity:.85;margin-top:3px}.customerDeliveryMapCard>header button{border:0;background:#ffffff22;color:#fff;border-radius:50%;font-size:26px;width:38px;height:38px}.customerDeliveryMapCard #customerDeliveryMapCanvas{height:min(55dvh,460px);min-height:260px}.customerDeliveryMapFooter{padding:14px;display:grid;gap:12px}.customerDeliveryMapFooter button{width:100%;background:#087c35;color:#fff;border:0;border-radius:10px;padding:13px;font-weight:800}.customerTrackingMapLink{color:#075bea;font-weight:800;text-decoration:underline;text-underline-offset:3px}.carrierTrackingLink{font-size:12px;white-space:nowrap}`;
-    document.head.appendChild(style);
-    modal.addEventListener("click", (event) => { if (event.target === modal || event.target.closest("[data-close-delivery-map]")) closeCustomerDeliveryMap(); });
-  }
-  closeCustomerDeliveryMap();
-  modal.classList.remove("hidden");
-  document.getElementById("customerDeliveryMapLocation").textContent = location || "Confirmed delivery location";
-  customerDeliveryMap = L.map("customerDeliveryMapCanvas", { scrollWheelZoom: false }).setView([lat, lng], 15);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" }).addTo(customerDeliveryMap);
-  L.circleMarker([lat, lng], { radius: 10, color: "#ffffff", weight: 3, fillColor: "#16a34a", fillOpacity: 1 }).addTo(customerDeliveryMap).bindPopup("Location confirmed by BIG ALIEN").openPopup();
-  setTimeout(() => customerDeliveryMap?.invalidateSize(), 100);
+function initCustomerShipmentMaps() {
+  document.querySelectorAll(".customerShipmentMap[data-map-lat]").forEach((element) => {
+    if (element.dataset.mapReady || !window.L) return;
+    const lat = Number(element.dataset.mapLat), lng = Number(element.dataset.mapLng);
+    const map = L.map(element.id, { scrollWheelZoom: false, dragging: true }).setView([lat, lng], 14);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" }).addTo(map);
+    L.circleMarker([lat, lng], { radius: 9, color: "#ffffff", weight: 3, fillColor: "#16a34a", fillOpacity: 1 }).addTo(map).bindPopup("Location confirmed by BIG ALIEN").openPopup();
+    element.dataset.mapReady = "1";
+  });
 }
-
-document.addEventListener("click", (event) => {
-  const link = event.target.closest("[data-open-delivery-map]");
-  if (!link) return;
-  event.preventDefault();
-  openCustomerDeliveryMap(Number(link.dataset.mapLat), Number(link.dataset.mapLng), link.dataset.mapLocation);
-});
 
 function expectedDeliveryText(order) {
   if (!order.expected_delivery_date) return "Not available yet";
@@ -1433,6 +1420,8 @@ async function openOrders() {
     list.innerHTML = `<div class="summary">No orders yet. Your purchases and delivery updates will appear here.</div>`;
     return;
   }
+
+  ensureDeliveredOrderStyles();
 
   customerOrdersCache = orders;
   customerOrderItemsCache = {};
@@ -1474,9 +1463,30 @@ async function openOrders() {
     const itemList = orderItems.length
       ? `<div class="orderProducts"><h4>Items in this order</h4>${orderItems.map(item => `<div class="orderProductRow">${item.image_url ? `<img src="${esc(item.image_url)}" alt="${esc(item.product_name)}" loading="lazy" decoding="async">` : `<span class="orderProductPlaceholder">🛍️</span>`}<div class="orderProductDetails"><b>${esc(item.product_name || "Product")}</b><small>Qty: ${Number(item.quantity) || 1}${item.size ? ` · Size: ${esc(item.size)}` : ""}${item.color ? ` · Colour: ${esc(item.color)}` : ""}</small></div><strong>${money((Number(item.product_price) || 0) * (Number(item.quantity) || 1))}</strong></div>`).join("")}</div>`
       : `<div class="orderProducts"><h4>Items in this order</h4><p class="muted">${itemsError ? "Order items are temporarily unavailable." : "No item details were saved for this order."}</p></div>`;
-    html += `<article class="orderCard" data-customer-order="${esc(o.id)}"><div class="orderCardTop"><div><span class="muted">ORDER NUMBER</span><b class="orderNumber">${esc(o.id.slice(0, 8).toUpperCase())}</b><small class="orderPlacedDate">${o.created_at ? new Date(o.created_at).toLocaleString() : ""}</small></div><span class="orderCurrentBadge">${esc(stage.label)}</span></div><div class="orderMetaGrid"><div><small>Order total</small><b>${money(o.total)}</b></div><div><small>Payment status</small><b class="paymentStatusText">${esc(o.payment_status || "Pending")}</b></div></div>${itemList}${renderOrderTimeline(stage)}<div class="orderInfo"><p><b>Expected delivery:</b> ${esc(expectedDeliveryText(o))}</p><p><b>Tracking number:</b> ${customerTrackingLink(o, updates)}</p><p><b>Delivery address:</b> ${esc(o.delivery_address || "Not available")}</p></div>${returnWindowMarkup(o)}${pickup ? `<div class="pickupNotice"><b>📦 Your item may be ready for collection.</b><p>${esc(latest?.message || "Please check the latest shipment details before travelling to collect it.")}</p></div>` : ""}<div class="shipmentHistory"><h4>Shipment updates</h4>${updates.map((u, updateIndex) => `<div class="shipmentUpdateRow"><span class="shipmentUpdatePin">📍</span><div><b>${esc(u.status || "Update")}</b><p>${esc(u.message || "")}</p><small>${u.created_at ? new Date(u.created_at).toLocaleString() : ""}</small></div></div>`).join("") || `<p class="muted">${updatesError ? "Shipment updates are temporarily unavailable." : "No shipment updates yet. We’ll show new updates here as the store processes your order."}</p>`}</div><div class="orderActionRow"><button type="button" class="secondary" data-order-receipt="${esc(o.id)}">Download / Print receipt</button><button type="button" class="primary" data-order-reorder="${esc(o.id)}">Reorder items</button></div></article>`;
+    const isDelivered = stage.label.toLowerCase() === "delivered" && stage.index === 4;
+    if (isDelivered) {
+      const itemSubtotal = orderItems.reduce((sum, item) =>
+        sum + (Number(item.product_price) || 0) * (Number(item.quantity) || 0), 0);
+      const deliveryFee = Number(o.total || 0) - itemSubtotal;
+      const deliveredDate = o.delivered_at || latest?.created_at;
+      const deliveredDateText = deliveredDate
+        ? new Date(deliveredDate).toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" })
+        : "";
+      html += `<article class="orderCard deliveredOrderCard" data-customer-order="${esc(o.id)}">
+        <div class="orderCardTop"><div><span class="muted">ORDER NUMBER</span><b class="orderNumber">${esc(o.id.slice(0, 8).toUpperCase())}</b><small class="orderPlacedDate">${o.created_at ? new Date(o.created_at).toLocaleString() : ""}</small></div><span class="orderCurrentBadge deliveredOrderBadge">Delivered</span></div>
+        <div class="orderMetaGrid"><div><small>Payment status</small><b class="paymentStatusText">${esc(o.payment_status || "Pending")}</b></div><div><small>Order total</small><b>${money(o.total)}</b></div></div>
+        <section class="deliveredConfirmation"><span class="deliveredCheck" aria-hidden="true">✓</span><div><b>Delivered</b><p>Your order was successfully delivered${deliveredDateText ? ` on ${esc(deliveredDateText)}` : ""}.</p></div></section>
+        ${itemList}
+        <div class="deliveredAddress"><h4>📍 Delivery Address</h4><p>${esc(o.delivery_address || "Not available")}</p></div>
+        <div class="deliveredOrderSummary"><h4>Order Summary</h4>${orderItems.length ? `<div><span>Subtotal</span><b>${money(itemSubtotal)}</b></div>${deliveryFee >= 0 ? `<div><span>Delivery Fee</span><b>${money(deliveryFee)}</b></div>` : `<div><span>Discount / adjustment</span><b>${money(deliveryFee)}</b></div>`}` : ""}<div class="deliveredTotal"><span>Total Paid</span><b>${money(o.total)}</b></div></div>
+        <div class="orderActionRow"><button type="button" class="secondary" data-order-receipt="${esc(o.id)}">Download / Print receipt</button><button type="button" class="primary" data-order-reorder="${esc(o.id)}">Reorder items</button></div>
+      </article>`;
+    } else {
+      html += `<article class="orderCard" data-customer-order="${esc(o.id)}"><div class="orderCardTop"><div><span class="muted">ORDER NUMBER</span><b class="orderNumber">${esc(o.id.slice(0, 8).toUpperCase())}</b><small class="orderPlacedDate">${o.created_at ? new Date(o.created_at).toLocaleString() : ""}</small></div><span class="orderCurrentBadge">${esc(stage.label)}</span></div><div class="orderMetaGrid"><div><small>Order total</small><b>${money(o.total)}</b></div><div><small>Payment status</small><b class="paymentStatusText">${esc(o.payment_status || "Pending")}</b></div></div>${itemList}${renderOrderTimeline(stage)}<div class="orderInfo"><p><b>Expected delivery:</b> ${esc(expectedDeliveryText(o))}</p><p><b>Tracking number:</b> ${customerTrackingLink(o)}</p><p><b>Delivery address:</b> ${esc(o.delivery_address || "Not available")}</p></div>${returnWindowMarkup(o)}${pickup ? `<div class="pickupNotice"><b>📦 Your item may be ready for collection.</b><p>${esc(latest?.message || "Please check the latest shipment details before travelling to collect it.")}</p></div>` : ""}<div class="shipmentHistory"><h4>Shipment updates</h4>${updates.map((u, updateIndex) => `<div class="shipmentUpdateRow"><span class="shipmentUpdatePin">📍</span><div><b>${esc(u.status || "Update")}</b><p>${esc(u.message || "")}</p><small>${u.created_at ? new Date(u.created_at).toLocaleString() : ""}</small>${shipmentMapMarkup(u, `${String(o.id).replace(/[^a-zA-Z0-9]/g, "")}${updateIndex}`)}</div></div>`).join("") || `<p class="muted">${updatesError ? "Shipment updates are temporarily unavailable." : "No shipment updates yet. We’ll show new updates here as the store processes your order."}</p>`}</div><div class="orderActionRow"><button type="button" class="secondary" data-order-receipt="${esc(o.id)}">Download / Print receipt</button><button type="button" class="primary" data-order-reorder="${esc(o.id)}">Reorder items</button></div></article>`;
+    }
   }
   list.innerHTML = html;
+  initCustomerShipmentMaps();
   refreshCustomerReturnCountdowns();
   if (customerReturnCountdownTimer) clearInterval(customerReturnCountdownTimer);
   customerReturnCountdownTimer = setInterval(refreshCustomerReturnCountdowns, 60000);
