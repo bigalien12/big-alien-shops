@@ -223,14 +223,43 @@ function toggleWishlist(id) {
 function imageOrFallback(url) {
   return url || "images/logo.png";
 }
+// Convert specific admin-entered product labels into customer-facing main categories.
+// Keep the original product.category unchanged so product names and search remain accurate.
+function mainCategoryForProduct(product) {
+  const raw = String(product?.category || "").trim();
+  const value = raw.toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+  if (!value) return "Other";
+
+  // Clothing subcategories are grouped under their department-level category.
+  if (/\b(women|woman|ladies|lady|girls?|female)\b/.test(value)) return "Women's Fashion";
+  if (/\b(men|man|mens|male|trouser|trousers|pants|jeans|shorts|shirts?|t shirts?|tee shirts?|suits?|blazers?|ties|menswear|footwear)\b/.test(value)) return "Men's Fashion";
+  if (/\b(home|kitchen|furniture|bedding|bedroom|bathroom|decor|household|curtains?)\b/.test(value)) return "Home";
+  if (/\b(sport|sports|fitness|gym|exercise|outdoor)\b/.test(value)) return "Sports";
+  if (/\b(craft|crafts|art|handmade|diy)\b/.test(value)) return "Crafts";
+  if (/\b(toy|toys|kids? toys?|children toys?)\b/.test(value)) return "Toys";
+  if (/\b(electronic|electronics|phone|mobile|computer|laptop|audio|camera|charger|power bank)\b/.test(value)) return "Electronics";
+  if (/\b(food|grocery|chicken|meat|fish|snack|beverage)\b/.test(value)) return "Food";
+  if (/\b(solar|inverter|battery|generator)\b/.test(value)) return "Solar";
+
+  // Preserve other intentional main categories, but normalize spelling/case
+  // so labels such as "men fashion" and "Men's Fashion" cannot create duplicates.
+  return raw
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, letter => letter.toUpperCase());
+}
 function renderCats() {
-  let departmentProducts = selectedDepartment === "all" ? products : products.filter(p => (p.department || "general") === selectedDepartment);
-  let cats = ["All", ...new Set(departmentProducts.map((p) => p.category))];
+  const departmentProducts = selectedDepartment === "all"
+    ? products
+    : products.filter(p => (p.department || "general") === selectedDepartment);
+  const priority = ["Women's Fashion", "Home", "Men's Fashion", "Sports", "Crafts", "Toys", "Electronics", "Food", "Solar"];
+  const found = [...new Set(departmentProducts.map(mainCategoryForProduct))];
+  const cats = ["All", ...priority.filter(name => found.includes(name)),
+    ...found.filter(name => !priority.includes(name)).sort((a, b) => a.localeCompare(b))];
+  if (!cats.includes(category)) category = "All";
   $("categories").innerHTML = cats
-    .map(
-      (c) =>
-        `<button class="${c === category ? "active" : ""}" data-cat="${esc( c )}">${esc(c)}</button>`
-    )
+    .map(c => `<button class="${c === category ? "active" : ""}" data-cat="${esc(c)}">${esc(c)}</button>`)
     .join("");
 }
 // Browsing history is stored only on this device, separately for each signed-in customer.
@@ -310,9 +339,9 @@ function renderProducts() {
   let list = products.filter(
     (p) =>
       (selectedDepartment === "all" || (p.department || "general") === selectedDepartment) &&
-      (category === "All" || p.category === category) &&
+      (category === "All" || mainCategoryForProduct(p) === category) &&
       (!query ||
-        `${p.name} ${p.description} ${p.category}`
+        `${p.name || ""} ${p.description || ""} ${p.category || ""}`
           .toLowerCase()
           .includes(query.toLowerCase()))
   );
