@@ -448,6 +448,54 @@ async function deleteProduct(id) {
   if (error) alert(error.message);
   else loadProducts();
 }
+let baAdminShipmentMap = null;
+let baAdminShipmentMarker = null;
+function setupAdminShipmentMap() {
+  const toggle = $("toggleShipmentMap");
+  const panel = $("shipmentMapPanel");
+  if (!toggle || !panel) return;
+  toggle.onclick = () => {
+    panel.classList.toggle("hidden");
+    toggle.textContent = panel.classList.contains("hidden") ? "＋ Add map location (optional)" : "− Hide map location";
+    if (!panel.classList.contains("hidden")) {
+      if (!window.L) return alert("The map could not load. Please check your internet connection and try again.");
+      if (!baAdminShipmentMap) {
+        baAdminShipmentMap = L.map("adminShipmentMap").setView([9.082, 8.675], 6);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" }).addTo(baAdminShipmentMap);
+        baAdminShipmentMap.on("click", (event) => setAdminShipmentPin(event.latlng.lat, event.latlng.lng));
+      }
+      setTimeout(() => baAdminShipmentMap.invalidateSize(), 120);
+    }
+  };
+  const search = async () => {
+    const query = $("shipmentMapSearch").value.trim();
+    if (!query) return alert("Enter a place to search for.");
+    try {
+      const response = await fetch("https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" + encodeURIComponent(query));
+      const results = await response.json();
+      if (!results.length) return alert("Location not found. Try a nearby town, area or landmark, or tap the map.");
+      const lat = Number(results[0].lat), lng = Number(results[0].lon);
+      baAdminShipmentMap.setView([lat, lng], 15);
+      setAdminShipmentPin(lat, lng);
+    } catch (error) { alert("Could not search for that location. You can tap the map to place the marker."); }
+  };
+  $("searchShipmentMap").onclick = search;
+  $("shipmentMapSearch").onkeydown = (event) => { if (event.key === "Enter") { event.preventDefault(); search(); } };
+  $("clearShipmentMap").onclick = () => {
+    if (baAdminShipmentMarker) baAdminShipmentMap.removeLayer(baAdminShipmentMarker);
+    baAdminShipmentMarker = null;
+    $("mMapLat").value = ""; $("mMapLng").value = "";
+    $("shipmentMapSelected").textContent = "No map location selected.";
+  };
+}
+function setAdminShipmentPin(lat, lng) {
+  $("mMapLat").value = Number(lat).toFixed(6);
+  $("mMapLng").value = Number(lng).toFixed(6);
+  if (baAdminShipmentMarker) baAdminShipmentMarker.setLatLng([lat, lng]);
+  else baAdminShipmentMarker = L.circleMarker([lat, lng], { radius: 9, color: "#ffffff", weight: 3, fillColor: "#16a34a", fillOpacity: 1 }).addTo(baAdminShipmentMap);
+  $("shipmentMapSelected").textContent = `Confirmed map pin: ${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`;
+}
+
 async function manageOrder(id) {
   const { data: o, error } = await sb
     .from("orders")
@@ -472,7 +520,7 @@ async function manageOrder(id) {
     .select("*")
     .eq("order_id", id)
     .order("created_at", { ascending: false });
-  $("orderModalBody").innerHTML = `<h2>Manage Order ${id.slice(0, 8)}</h2><p>${esc(o.customer_name)} · ${esc(o.customer_phone)}</p><p>${esc(o.delivery_address)}</p>${specialRequestHtml(o)}<h3>Payment & Rewards</h3>${rewardsInfoHtml(o)}<h3>Ordered products</h3>${orderedProductsHtml}<label>Payment status<select id="mPay"><option ${o.payment_status === "pending" ? "selected" : ""}>pending</option><option ${o.payment_status === "paid" ? "selected" : ""}>paid</option><option ${o.payment_status === "failed" ? "selected" : ""}>failed</option><option ${o.payment_status === "refunded" ? "selected" : ""}>refunded</option></select></label><label>Shipment status<select id="mStatus">${["processing", "confirmed", "shipped", "out_for_delivery", "delivered", "cancelled"].map(s => `<option value="${s}" ${o.order_status === s ? "selected" : ""}>${s}</option>`).join("")}</select></label><label>Expected delivery date<input id="mExpectedDelivery" type="date" value="${esc(o.expected_delivery_date || "")}"></label><label>Tracking number<input id="mTrack" value="${esc(o.tracking_number || "")}" placeholder="Enter carrier tracking number"></label><label>Tracking website link<input id="mTrackingUrl" type="url" value="${esc(o.tracking_url || "")}" placeholder="https://carrier.com/track/..."></label><p class="muted">Paste the carrier's full tracking URL. Customers will be able to tap their tracking number to open it.</p><label>Shipment update<textarea id="mMessage" placeholder="e.g. Package has left Abuja sorting centre"></textarea></label><label>Location<input id="mLocation" placeholder="e.g. Abuja"></label><button class="primary" id="saveOrder">Save Update</button><h3>Shipment history</h3>${(ups || []).map(u => `<div class="summary">📍 <b>${esc(u.status)}</b> — ${esc(u.message)}<br><span class="muted">${esc(u.location || "")} ${new Date(u.created_at).toLocaleString()}</span></div>`).join("") || '<p class="muted">No shipment updates yet.</p>'}`;
+  $("orderModalBody").innerHTML = `<h2>Manage Order ${id.slice(0, 8)}</h2><p>${esc(o.customer_name)} · ${esc(o.customer_phone)}</p><p>${esc(o.delivery_address)}</p>${specialRequestHtml(o)}<h3>Payment & Rewards</h3>${rewardsInfoHtml(o)}<h3>Ordered products</h3>${orderedProductsHtml}<label>Payment status<select id="mPay"><option ${o.payment_status === "pending" ? "selected" : ""}>pending</option><option ${o.payment_status === "paid" ? "selected" : ""}>paid</option><option ${o.payment_status === "failed" ? "selected" : ""}>failed</option><option ${o.payment_status === "refunded" ? "selected" : ""}>refunded</option></select></label><label>Shipment status<select id="mStatus">${["processing", "confirmed", "shipped", "out_for_delivery", "delivered", "cancelled"].map(s => `<option value="${s}" ${o.order_status === s ? "selected" : ""}>${s}</option>`).join("")}</select></label><label>Expected delivery date<input id="mExpectedDelivery" type="date" value="${esc(o.expected_delivery_date || "")}"></label><label>Tracking number<input id="mTrack" value="${esc(o.tracking_number || "")}" placeholder="Enter carrier tracking number"></label><label>Tracking website link<input id="mTrackingUrl" type="url" value="${esc(o.tracking_url || "")}" placeholder="https://carrier.com/track/..."></label><p class="muted">Paste the carrier's full tracking URL. Customers will be able to tap their tracking number to open it.</p><label>Shipment update<textarea id="mMessage" placeholder="e.g. Package has left Abuja sorting centre"></textarea></label><label>Location<input id="mLocation" placeholder="e.g. Abuja"></label><div class="baMapPicker"><button type="button" class="secondary" id="toggleShipmentMap">＋ Add map location (optional)</button><div id="shipmentMapPanel" class="hidden"><p class="muted">Search for the driver's confirmed location or tap the map to place the green marker. You can leave this empty.</p><div class="baMapSearch"><input id="shipmentMapSearch" type="search" placeholder="Search a place, area or address"><button type="button" class="secondary" id="searchShipmentMap">Search</button><button type="button" class="secondary" id="clearShipmentMap">Clear</button></div><div id="adminShipmentMap" class="baShipmentMap"></div><small id="shipmentMapSelected" class="muted">No map location selected.</small><input type="hidden" id="mMapLat"><input type="hidden" id="mMapLng"></div></div><button class="primary" id="saveOrder">Save Update</button><h3>Shipment history</h3>${(ups || []).map(u => `<div class="summary">📍 <b>${esc(u.status)}</b> — ${esc(u.message)}<br><span class="muted">${esc(u.location || "")} ${new Date(u.created_at).toLocaleString()}</span></div>`).join("") || '<p class="muted">No shipment updates yet.</p>'}`;
   $("saveOrder").onclick = async () => {
     const nextStatus = $("mStatus").value;
     const trackingUrlInput = $("mTrackingUrl").value.trim();
@@ -512,14 +560,17 @@ async function manageOrder(id) {
         rewardsNotice = ` ${awarded} BIG ALIEN reward points awarded.`;
       }
     }
-    if ($("mMessage").value.trim()) {
+    const shipmentMessage = $("mMessage").value.trim() || ($("mMapLat").value ? "Location confirmed by BIG ALIEN." : "");
+    if (shipmentMessage) {
       const { error: e } = await sb
         .from("shipment_updates")
         .insert({
           order_id: id,
           status: $("mStatus").value,
-          message: $("mMessage").value.trim(),
+          message: shipmentMessage,
           location: $("mLocation").value.trim() || null,
+          latitude: $("mMapLat").value ? Number($("mMapLat").value) : null,
+          longitude: $("mMapLng").value ? Number($("mMapLng").value) : null,
         });
       if (e) return alert(e.message);
       const { error: notifyError } = await sb
@@ -528,7 +579,7 @@ async function manageOrder(id) {
           recipient_user_id: o.user_id,
           order_id: id,
           title: "Shipment update",
-          message: `Order ${id.slice(0, 8)}: ${$("mMessage").value.trim()}`,
+          message: `Order ${id.slice(0, 8)}: ${shipmentMessage}`,
           type: "shipment_update",
         });
       if (notifyError) return alert(notifyError.message);
@@ -549,6 +600,7 @@ async function manageOrder(id) {
     alert("Order updated. The customer will see the new shipment status." + rewardsNotice);
   };
   $("orderModal").classList.remove("hidden");
+  setupAdminShipmentMap();
 }
 document.addEventListener("click", async (e) => {
   const t = e.target.closest("button") || e.target;

@@ -11,6 +11,12 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Big Alien Venture">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <style>
+    .baShipmentMap{height:220px;width:100%;border-radius:12px;border:1px solid var(--line);overflow:hidden;margin:10px 0;z-index:1}
+    .customerShipmentMapWrap{margin-top:12px;padding:10px;border:1px solid var(--line);border-radius:12px}
+    .customerShipmentMapWrap>a{display:inline-block;margin-top:6px}
+  </style>
   <style>
     .passwordField{display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box}
     .passwordField input{flex:1;min-width:0}
@@ -506,7 +512,8 @@
 <footer>© Big Alien Venture 👽 · Customer service 07025136166</footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="app.js?v=16"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="app.js?v=17"></script>
 <script>
   document.querySelectorAll('.passwordToggle[data-password-target]').forEach(function(button){
     button.addEventListener('click', function(){

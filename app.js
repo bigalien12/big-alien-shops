@@ -1348,6 +1348,23 @@ function customerTrackingLink(order) {
   }
 }
 
+function shipmentMapMarkup(update, index) {
+  const lat = Number(update.latitude), lng = Number(update.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) return "";
+  return `<div class="customerShipmentMapWrap"><b>📍 Confirmed delivery location</b><div id="customerShipmentMap${index}" class="baShipmentMap customerShipmentMap" data-map-lat="${lat}" data-map-lng="${lng}"></div><small class="muted">Location manually confirmed by BIG ALIEN</small><a href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=16/${lat}/${lng}" target="_blank" rel="noopener noreferrer">Open larger map ↗</a></div>`;
+}
+
+function initCustomerShipmentMaps() {
+  document.querySelectorAll(".customerShipmentMap[data-map-lat]").forEach((element) => {
+    if (element.dataset.mapReady || !window.L) return;
+    const lat = Number(element.dataset.mapLat), lng = Number(element.dataset.mapLng);
+    const map = L.map(element.id, { scrollWheelZoom: false, dragging: true }).setView([lat, lng], 14);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" }).addTo(map);
+    L.circleMarker([lat, lng], { radius: 9, color: "#ffffff", weight: 3, fillColor: "#16a34a", fillOpacity: 1 }).addTo(map).bindPopup("Location confirmed by BIG ALIEN").openPopup();
+    element.dataset.mapReady = "1";
+  });
+}
+
 function expectedDeliveryText(order) {
   if (!order.expected_delivery_date) return "Not available yet";
   const date = new Date(`${order.expected_delivery_date}T00:00:00`);
@@ -1422,9 +1439,10 @@ async function openOrders() {
     const itemList = orderItems.length
       ? `<div class="orderProducts"><h4>Items in this order</h4>${orderItems.map(item => `<div class="orderProductRow">${item.image_url ? `<img src="${esc(item.image_url)}" alt="${esc(item.product_name)}" loading="lazy" decoding="async">` : `<span class="orderProductPlaceholder">🛍️</span>`}<div class="orderProductDetails"><b>${esc(item.product_name || "Product")}</b><small>Qty: ${Number(item.quantity) || 1}${item.size ? ` · Size: ${esc(item.size)}` : ""}${item.color ? ` · Colour: ${esc(item.color)}` : ""}</small></div><strong>${money((Number(item.product_price) || 0) * (Number(item.quantity) || 1))}</strong></div>`).join("")}</div>`
       : `<div class="orderProducts"><h4>Items in this order</h4><p class="muted">${itemsError ? "Order items are temporarily unavailable." : "No item details were saved for this order."}</p></div>`;
-    html += `<article class="orderCard" data-customer-order="${esc(o.id)}"><div class="orderCardTop"><div><span class="muted">ORDER NUMBER</span><b class="orderNumber">${esc(o.id.slice(0, 8).toUpperCase())}</b><small class="orderPlacedDate">${o.created_at ? new Date(o.created_at).toLocaleString() : ""}</small></div><span class="orderCurrentBadge">${esc(stage.label)}</span></div><div class="orderMetaGrid"><div><small>Order total</small><b>${money(o.total)}</b></div><div><small>Payment status</small><b class="paymentStatusText">${esc(o.payment_status || "Pending")}</b></div></div>${itemList}${renderOrderTimeline(stage)}<div class="orderInfo"><p><b>Expected delivery:</b> ${esc(expectedDeliveryText(o))}</p><p><b>Tracking number:</b> ${customerTrackingLink(o)}</p><p><b>Delivery address:</b> ${esc(o.delivery_address || "Not available")}</p></div>${returnWindowMarkup(o)}${pickup ? `<div class="pickupNotice"><b>📦 Your item may be ready for collection.</b><p>${esc(latest?.message || "Please check the latest shipment details before travelling to collect it.")}</p></div>` : ""}<div class="shipmentHistory"><h4>Shipment updates</h4>${updates.map((u) => `<div class="shipmentUpdateRow"><span class="shipmentUpdatePin">📍</span><div><b>${esc(u.status || "Update")}</b><p>${esc(u.message || "")}</p><small>${u.created_at ? new Date(u.created_at).toLocaleString() : ""}</small></div></div>`).join("") || `<p class="muted">${updatesError ? "Shipment updates are temporarily unavailable." : "No shipment updates yet. We’ll show new updates here as the store processes your order."}</p>`}</div><div class="orderActionRow"><button type="button" class="secondary" data-order-receipt="${esc(o.id)}">Download / Print receipt</button><button type="button" class="primary" data-order-reorder="${esc(o.id)}">Reorder items</button></div></article>`;
+    html += `<article class="orderCard" data-customer-order="${esc(o.id)}"><div class="orderCardTop"><div><span class="muted">ORDER NUMBER</span><b class="orderNumber">${esc(o.id.slice(0, 8).toUpperCase())}</b><small class="orderPlacedDate">${o.created_at ? new Date(o.created_at).toLocaleString() : ""}</small></div><span class="orderCurrentBadge">${esc(stage.label)}</span></div><div class="orderMetaGrid"><div><small>Order total</small><b>${money(o.total)}</b></div><div><small>Payment status</small><b class="paymentStatusText">${esc(o.payment_status || "Pending")}</b></div></div>${itemList}${renderOrderTimeline(stage)}<div class="orderInfo"><p><b>Expected delivery:</b> ${esc(expectedDeliveryText(o))}</p><p><b>Tracking number:</b> ${customerTrackingLink(o)}</p><p><b>Delivery address:</b> ${esc(o.delivery_address || "Not available")}</p></div>${returnWindowMarkup(o)}${pickup ? `<div class="pickupNotice"><b>📦 Your item may be ready for collection.</b><p>${esc(latest?.message || "Please check the latest shipment details before travelling to collect it.")}</p></div>` : ""}<div class="shipmentHistory"><h4>Shipment updates</h4>${updates.map((u, updateIndex) => `<div class="shipmentUpdateRow"><span class="shipmentUpdatePin">📍</span><div><b>${esc(u.status || "Update")}</b><p>${esc(u.message || "")}</p><small>${u.created_at ? new Date(u.created_at).toLocaleString() : ""}</small>${shipmentMapMarkup(u, `${String(o.id).replace(/[^a-zA-Z0-9]/g, "")}${updateIndex}`)}</div></div>`).join("") || `<p class="muted">${updatesError ? "Shipment updates are temporarily unavailable." : "No shipment updates yet. We’ll show new updates here as the store processes your order."}</p>`}</div><div class="orderActionRow"><button type="button" class="secondary" data-order-receipt="${esc(o.id)}">Download / Print receipt</button><button type="button" class="primary" data-order-reorder="${esc(o.id)}">Reorder items</button></div></article>`;
   }
   list.innerHTML = html;
+  initCustomerShipmentMaps();
   refreshCustomerReturnCountdowns();
   if (customerReturnCountdownTimer) clearInterval(customerReturnCountdownTimer);
   customerReturnCountdownTimer = setInterval(refreshCustomerReturnCountdowns, 60000);

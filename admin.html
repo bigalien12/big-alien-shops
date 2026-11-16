@@ -8,6 +8,14 @@
   <link rel="icon" href="images/logo.png">
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="admin.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <style>
+    .baShipmentMap{height:260px;width:100%;border-radius:12px;border:1px solid var(--line);overflow:hidden;margin:10px 0;z-index:1}
+    .baMapPicker{margin:14px 0;padding:12px;border:1px solid var(--line);border-radius:12px}
+    .baMapSearch{display:flex;gap:8px;flex-wrap:wrap}.baMapSearch input{flex:1;min-width:150px}
+    .customerShipmentMapWrap{margin-top:12px;padding:10px;border:1px solid var(--line);border-radius:12px}
+    .customerShipmentMap{height:220px}.customerShipmentMapWrap>a{display:inline-block;margin-top:6px}
+  </style>
 
 <style id="bigAlienAnalyticsStyles">
   .analyticsIntro{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0 16px}
@@ -76,7 +84,8 @@
 <footer>© Big Alien Venture 👽 · Admin dashboard</footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
-<script src="admin.js?v=11"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="admin.js?v=12"></script>
   <script type="module" src="notifications.js"></script>
 </body>
 </html>
