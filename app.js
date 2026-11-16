@@ -1290,7 +1290,11 @@ async function submitOrder(e) {
 }
 function orderTrackingStage(order, updates) {
   const latest = updates?.[0] || null;
-  const current = `${order.order_status || ""} ${latest?.status || ""} ${latest?.message || ""}`.toLowerCase();
+  // Supabase stores statuses such as "out_for_delivery"; normalize separators
+  // before matching so the timeline advances for both underscore and space forms.
+  const current = `${order.order_status || ""} ${latest?.status || ""} ${latest?.message || ""}`
+    .toLowerCase()
+    .replace(/[_-]+/g, " ");
   if (/cancel|refund|return/.test(current)) return { terminal: true, label: "Cancelled / Returned", index: -1 };
   if (/delivered|successfully received|order complete/.test(current)) return { terminal: false, label: "Delivered", index: 4 };
   if (/ready for pickup|available for pickup|at pickup point|arrived at pickup/.test(current)) return { terminal: false, label: "Ready for pickup", index: 3 };

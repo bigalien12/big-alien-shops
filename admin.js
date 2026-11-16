@@ -450,6 +450,10 @@ async function deleteProduct(id) {
 }
 let baAdminShipmentMap = null;
 let baAdminShipmentMarker = null;
+let baAdminCurrentOrderId = null;
+function bigAlienMapTrackingNumber(orderId) {
+  return `BA-MAP-${String(orderId).replace(/-/g, "").slice(0, 8).toUpperCase()}`;
+}
 function setupAdminShipmentMap() {
   const toggle = $("toggleShipmentMap");
   const panel = $("shipmentMapPanel");
@@ -463,6 +467,12 @@ function setupAdminShipmentMap() {
         baAdminShipmentMap = L.map("adminShipmentMap").setView([9.082, 8.675], 6);
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" }).addTo(baAdminShipmentMap);
         baAdminShipmentMap.on("click", (event) => setAdminShipmentPin(event.latlng.lat, event.latlng.lng));
+        const savedLat = Number($("mMapLat")?.value);
+        const savedLng = Number($("mMapLng")?.value);
+        if (Number.isFinite(savedLat) && Number.isFinite(savedLng) && $("mMapLat")?.value && $("mMapLng")?.value) {
+          baAdminShipmentMap.setView([savedLat, savedLng], 15);
+          setAdminShipmentPin(savedLat, savedLng);
+        }
       }
       setTimeout(() => baAdminShipmentMap.invalidateSize(), 120);
     }
@@ -485,10 +495,17 @@ function setupAdminShipmentMap() {
     if (baAdminShipmentMarker) baAdminShipmentMap.removeLayer(baAdminShipmentMarker);
     baAdminShipmentMarker = null;
     $("mMapLat").value = ""; $("mMapLng").value = "";
+    const trackingInput = $("mTrack");
+    if (trackingInput && baAdminCurrentOrderId && trackingInput.value === bigAlienMapTrackingNumber(baAdminCurrentOrderId)) trackingInput.value = "";
     $("shipmentMapSelected").textContent = "No map location selected.";
   };
 }
 function setAdminShipmentPin(lat, lng) {
+  // Selecting a confirmed map pin automatically creates the BIG ALIEN map-tracking ID.
+  const trackingInput = $("mTrack");
+  if (trackingInput && !trackingInput.value.trim() && baAdminCurrentOrderId) {
+    trackingInput.value = bigAlienMapTrackingNumber(baAdminCurrentOrderId);
+  }
   $("mMapLat").value = Number(lat).toFixed(6);
   $("mMapLng").value = Number(lng).toFixed(6);
   if (baAdminShipmentMarker) baAdminShipmentMarker.setLatLng([lat, lng]);
@@ -497,6 +514,7 @@ function setAdminShipmentPin(lat, lng) {
 }
 
 async function manageOrder(id) {
+  baAdminCurrentOrderId = id;
   // The order modal replaces its map element each time, so dispose of the old Leaflet instance first.
   if (baAdminShipmentMap) { baAdminShipmentMap.remove(); baAdminShipmentMap = null; }
   baAdminShipmentMarker = null;
@@ -524,6 +542,16 @@ async function manageOrder(id) {
     .eq("order_id", id)
     .order("created_at", { ascending: false });
   $("orderModalBody").innerHTML = `<h2>Manage Order ${id.slice(0, 8)}</h2><p>${esc(o.customer_name)} · ${esc(o.customer_phone)}</p><p>${esc(o.delivery_address)}</p>${specialRequestHtml(o)}<h3>Payment & Rewards</h3>${rewardsInfoHtml(o)}<h3>Ordered products</h3>${orderedProductsHtml}<label>Payment status<select id="mPay"><option ${o.payment_status === "pending" ? "selected" : ""}>pending</option><option ${o.payment_status === "paid" ? "selected" : ""}>paid</option><option ${o.payment_status === "failed" ? "selected" : ""}>failed</option><option ${o.payment_status === "refunded" ? "selected" : ""}>refunded</option></select></label><label>Shipment status<select id="mStatus">${["processing", "confirmed", "shipped", "out_for_delivery", "delivered", "cancelled"].map(s => `<option value="${s}" ${o.order_status === s ? "selected" : ""}>${s}</option>`).join("")}</select></label><label>Expected delivery date<input id="mExpectedDelivery" type="date" value="${esc(o.expected_delivery_date || "")}"></label><label>Tracking number<input id="mTrack" value="${esc(o.tracking_number || "")}" placeholder="Enter carrier tracking number"></label><label>Tracking website link<input id="mTrackingUrl" type="url" value="${esc(o.tracking_url || "")}" placeholder="https://carrier.com/track/..."></label><p class="muted">The tracking number opens the BIG ALIEN map when you add a confirmed location. The carrier link remains available separately.</p><label>Shipment update<textarea id="mMessage" placeholder="e.g. Package has left Abuja sorting centre"></textarea></label><label>Location<input id="mLocation" placeholder="e.g. Abuja"></label><div class="baMapPicker"><button type="button" class="secondary" id="toggleShipmentMap">＋ Add map location (optional)</button><div id="shipmentMapPanel" class="hidden"><p class="muted">Search for the driver's confirmed location or tap the map to place the green marker. You can leave this empty.</p><div class="baMapSearch"><input id="shipmentMapSearch" type="search" placeholder="Search a place, area or address"><button type="button" class="secondary" id="searchShipmentMap">Search</button><button type="button" class="secondary" id="clearShipmentMap">Clear</button></div><div id="adminShipmentMap" class="baShipmentMap"></div><small id="shipmentMapSelected" class="muted">No map location selected.</small><input type="hidden" id="mMapLat"><input type="hidden" id="mMapLng"></div></div><button class="primary" id="saveOrder">Save Update</button><h3>Shipment history</h3>${(ups || []).map(u => `<div class="summary">📍 <b>${esc(u.status)}</b> — ${esc(u.message)}<br><span class="muted">${esc(u.location || "")} ${new Date(u.created_at).toLocaleString()}</span></div>`).join("") || '<p class="muted">No shipment updates yet.</p>'}`;
+  // Restore the latest previously confirmed map pin when reopening an order.
+  // This lets older test orders receive their automatic BIG ALIEN map-tracking ID on save.
+  const savedMapUpdate = (ups || []).find((u) => u.latitude != null && u.longitude != null && u.latitude !== "" && u.longitude !== "");
+  if (savedMapUpdate) {
+    $("mMapLat").value = String(savedMapUpdate.latitude);
+    $("mMapLng").value = String(savedMapUpdate.longitude);
+    if (!$("mTrack").value.trim()) $("mTrack").value = bigAlienMapTrackingNumber(id);
+    $("shipmentMapSelected").textContent = `Previously confirmed map pin: ${Number(savedMapUpdate.latitude).toFixed(5)}, ${Number(savedMapUpdate.longitude).toFixed(5)}`;
+  }
+
   $("saveOrder").onclick = async () => {
     const nextStatus = $("mStatus").value;
     const trackingUrlInput = $("mTrackingUrl").value.trim();
@@ -537,11 +565,15 @@ async function manageOrder(id) {
         return alert("Please enter a valid tracking website link starting with https://");
       }
     }
+    const hasConfirmedMapLocation = Boolean($("mMapLat").value && $("mMapLng").value);
+    const enteredTrackingNumber = $("mTrack").value.trim();
+    const savedTrackingNumber = enteredTrackingNumber || (hasConfirmedMapLocation ? bigAlienMapTrackingNumber(id) : null);
+    if (savedTrackingNumber) $("mTrack").value = savedTrackingNumber;
     const orderUpdate = {
       payment_status: $("mPay").value,
       order_status: nextStatus,
       expected_delivery_date: $("mExpectedDelivery").value || null,
-      tracking_number: $("mTrack").value.trim() || null,
+      tracking_number: savedTrackingNumber,
       tracking_url: normalizedTrackingUrl,
     };
     // Record the first time the order is marked delivered. Do not restart the 3-day window on later edits.
