@@ -339,9 +339,12 @@ async function loadOrders() {
   }
   $("adminOrders").innerHTML =
     (data || [])
-      .map(
-        (o) => `<div class="orderCard"><b>Order ${o.id.slice(0, 8)}</b> <p>${esc(o.customer_name)} · ${esc(o.customer_phone)} · ${money( o.total )}</p> <p>Payment: <span class="status">${esc( o.payment_status )}</span> · Shipment: <span class="status">${esc(o.order_status)}</span></p> <p>Tracking: ${esc( o.tracking_number || "Not assigned" )}</p><p>Address: ${esc(o.delivery_address)}</p>${specialRequestHtml(o)}${rewardsInfoHtml(o)} <button class="primary" data-order="${ o.id }">Manage Order & Shipment</button></div>`
-      )
+      .map((o) => {
+        const expected = o.expected_delivery_date
+          ? new Date(`${o.expected_delivery_date}T00:00:00`).toLocaleDateString("en-NG", { dateStyle: "medium" })
+          : "Not set";
+        return `<div class="orderCard"><b>Order ${o.id.slice(0, 8)}</b> <p>${esc(o.customer_name)} · ${esc(o.customer_phone)} · ${money(o.total)}</p> <p>Payment: <span class="status">${esc(o.payment_status)}</span> · Shipment: <span class="status">${esc(o.order_status)}</span></p> <p>Expected delivery: <b>${esc(expected)}</b></p><p>Tracking: ${esc(o.tracking_number || "Not assigned")}</p><p>Address: ${esc(o.delivery_address)}</p>${specialRequestHtml(o)}${rewardsInfoHtml(o)} <button class="primary" data-order="${o.id}">Manage Order & Shipment</button></div>`;
+      })
       .join("") || '<div class="summary">No orders yet.</div>';
 }
 function openProduct(p, defaultDepartment = "general") {
@@ -469,15 +472,34 @@ async function manageOrder(id) {
     .select("*")
     .eq("order_id", id)
     .order("created_at", { ascending: false });
-  $("orderModalBody").innerHTML = `<h2>Manage Order ${id.slice( 0, 8 )}</h2><p>${esc(o.customer_name)} · ${esc(o.customer_phone)}</p> <p>${esc( o.delivery_address )}</p>${specialRequestHtml(o)}<h3>Payment & Rewards</h3>${rewardsInfoHtml(o)}<h3>Ordered products</h3>${orderedProductsHtml} <label>Payment status<select id="mPay"><option ${ o.payment_status === "pending" ? "selected" : "" }>pending</option> <option ${ o.payment_status === "paid" ? "selected" : "" }>paid</option><option ${ o.payment_status === "failed" ? "selected" : "" }>failed</option> <option ${ o.payment_status === "refunded" ? "selected" : "" }>refunded</option></select></label> <label>Shipment status<select id="mStatus">${[ "processing", "confirmed", "shipped", "out_for_delivery", "delivered", "cancelled", ] .map( (s) => `<option value="${s}" ${ o.order_status === s ? "selected" : "" }>${s}</option>` ) .join("")}</select></label> <label>Tracking number<input id="mTrack" value="${esc( o.tracking_number || "" )}"></label> <label>Shipment update<textarea id="mMessage" placeholder="e.g. Package has left Abuja sorting centre"></textarea></label> <label>Location<input id="mLocation" placeholder="e.g. Abuja"></label><button class="primary" id="saveOrder">Save Update</button> <h3>Shipment history</h3>${ (ups || []) .map( (u) => `<div class="summary">📍 <b>${esc(u.status)}</b> — ${esc( u.message )}<br><span class="muted">${esc(u.location || "")} ${new Date( u.created_at ).toLocaleString()}</span></div>` ) .join("") || '<p class="muted">No shipment updates yet.</p>' }`;
+  $("orderModalBody").innerHTML = `<h2>Manage Order ${id.slice(0, 8)}</h2><p>${esc(o.customer_name)} · ${esc(o.customer_phone)}</p><p>${esc(o.delivery_address)}</p>${specialRequestHtml(o)}<h3>Payment & Rewards</h3>${rewardsInfoHtml(o)}<h3>Ordered products</h3>${orderedProductsHtml}<label>Payment status<select id="mPay"><option ${o.payment_status === "pending" ? "selected" : ""}>pending</option><option ${o.payment_status === "paid" ? "selected" : ""}>paid</option><option ${o.payment_status === "failed" ? "selected" : ""}>failed</option><option ${o.payment_status === "refunded" ? "selected" : ""}>refunded</option></select></label><label>Shipment status<select id="mStatus">${["processing", "confirmed", "shipped", "out_for_delivery", "delivered", "cancelled"].map(s => `<option value="${s}" ${o.order_status === s ? "selected" : ""}>${s}</option>`).join("")}</select></label><label>Expected delivery date<input id="mExpectedDelivery" type="date" value="${esc(o.expected_delivery_date || "")}"></label><label>Tracking number<input id="mTrack" value="${esc(o.tracking_number || "")}" placeholder="Enter carrier tracking number"></label><label>Tracking website link<input id="mTrackingUrl" type="url" value="${esc(o.tracking_url || "")}" placeholder="https://carrier.com/track/..."></label><p class="muted">Paste the carrier's full tracking URL. Customers will be able to tap their tracking number to open it.</p><label>Shipment update<textarea id="mMessage" placeholder="e.g. Package has left Abuja sorting centre"></textarea></label><label>Location<input id="mLocation" placeholder="e.g. Abuja"></label><button class="primary" id="saveOrder">Save Update</button><h3>Shipment history</h3>${(ups || []).map(u => `<div class="summary">📍 <b>${esc(u.status)}</b> — ${esc(u.message)}<br><span class="muted">${esc(u.location || "")} ${new Date(u.created_at).toLocaleString()}</span></div>`).join("") || '<p class="muted">No shipment updates yet.</p>'}`;
   $("saveOrder").onclick = async () => {
+    const nextStatus = $("mStatus").value;
+    const trackingUrlInput = $("mTrackingUrl").value.trim();
+    let normalizedTrackingUrl = null;
+    if (trackingUrlInput) {
+      try {
+        const parsedTrackingUrl = new URL(trackingUrlInput);
+        if (!["http:", "https:"].includes(parsedTrackingUrl.protocol)) throw new Error("Use an http or https tracking link.");
+        normalizedTrackingUrl = parsedTrackingUrl.href;
+      } catch (urlError) {
+        return alert("Please enter a valid tracking website link starting with https://");
+      }
+    }
+    const orderUpdate = {
+      payment_status: $("mPay").value,
+      order_status: nextStatus,
+      expected_delivery_date: $("mExpectedDelivery").value || null,
+      tracking_number: $("mTrack").value.trim() || null,
+      tracking_url: normalizedTrackingUrl,
+    };
+    // Record the first time the order is marked delivered. Do not restart the 3-day window on later edits.
+    if (nextStatus === "delivered" && !o.delivered_at) {
+      orderUpdate.delivered_at = new Date().toISOString();
+    }
     const { error } = await sb
       .from("orders")
-      .update({
-        payment_status: $("mPay").value,
-        order_status: $("mStatus").value,
-        tracking_number: $("mTrack").value.trim() || null,
-      })
+      .update(orderUpdate)
       .eq("id", id);
     if (error) return alert(error.message);
     let rewardsNotice = "";

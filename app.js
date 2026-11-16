@@ -1306,6 +1306,54 @@ function renderOrderTimeline(stage) {
   return `<div class="trackingBlock"><div class="trackingHeading"><b>Delivery progress</b><span>${esc(stage.label)}</span></div><ol class="trackingTimeline">${steps.map((label, i) => `<li class="${i < stage.index ? "complete" : i === stage.index ? "current" : "pending"}"><span class="trackingDot">${i < stage.index ? "✓" : i + 1}</span><span class="trackingStepText"><b>${label}</b>${i === stage.index ? `<small>Current stage</small>` : ""}</span></li>`).join("")}</ol></div>`;
 }
 
+
+let customerReturnCountdownTimer = null;
+
+function returnWindowMarkup(order) {
+  const isDelivered = String(order.order_status || "").toLowerCase() === "delivered";
+  if (!isDelivered) return "";
+  if (!order.delivered_at) {
+    return `<div class="returnWindowNotice"><b>3-day return period</b><p class="muted">Your delivery date is being confirmed. Please contact customer service if you need help.</p></div>`;
+  }
+  const deadline = new Date(order.delivered_at).getTime() + 3 * 24 * 60 * 60 * 1000;
+  return `<div class="returnWindowNotice"><b>Return window</b><p data-return-countdown data-deadline="${deadline}">Calculating…</p></div>`;
+}
+
+function refreshCustomerReturnCountdowns() {
+  document.querySelectorAll("[data-return-countdown]").forEach((node) => {
+    const deadline = Number(node.dataset.deadline);
+    const remaining = deadline - Date.now();
+    if (!Number.isFinite(deadline) || remaining <= 0) {
+      node.textContent = "Return Window Closed";
+      node.setAttribute("aria-label", "Return window closed");
+      return;
+    }
+    const totalMinutes = Math.floor(remaining / 60000);
+    const days = Math.floor(totalMinutes / 1440);
+    const hours = Math.floor((totalMinutes % 1440) / 60);
+    const minutes = totalMinutes % 60;
+    node.textContent = `${days} day${days === 1 ? "" : "s"}, ${hours} hour${hours === 1 ? "" : "s"}, ${minutes} minute${minutes === 1 ? "" : "s"} remaining to contact BIG ALIEN`;
+  });
+}
+
+function customerTrackingLink(order) {
+  const number = order.tracking_number || "Not assigned yet";
+  if (!order.tracking_url) return esc(number);
+  try {
+    const url = new URL(order.tracking_url);
+    if (!["http:", "https:"].includes(url.protocol)) return esc(number);
+    return `<a href="${esc(url.href)}" target="_blank" rel="noopener noreferrer">${esc(number)} ↗</a>`;
+  } catch (_) {
+    return esc(number);
+  }
+}
+
+function expectedDeliveryText(order) {
+  if (!order.expected_delivery_date) return "Not available yet";
+  const date = new Date(`${order.expected_delivery_date}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? "Not available yet" : date.toLocaleDateString("en-NG", { dateStyle: "long" });
+}
+
 async function openOrders() {
   show("ordersView");
   const list = $("ordersList");
@@ -1374,9 +1422,12 @@ async function openOrders() {
     const itemList = orderItems.length
       ? `<div class="orderProducts"><h4>Items in this order</h4>${orderItems.map(item => `<div class="orderProductRow">${item.image_url ? `<img src="${esc(item.image_url)}" alt="${esc(item.product_name)}" loading="lazy" decoding="async">` : `<span class="orderProductPlaceholder">🛍️</span>`}<div class="orderProductDetails"><b>${esc(item.product_name || "Product")}</b><small>Qty: ${Number(item.quantity) || 1}${item.size ? ` · Size: ${esc(item.size)}` : ""}${item.color ? ` · Colour: ${esc(item.color)}` : ""}</small></div><strong>${money((Number(item.product_price) || 0) * (Number(item.quantity) || 1))}</strong></div>`).join("")}</div>`
       : `<div class="orderProducts"><h4>Items in this order</h4><p class="muted">${itemsError ? "Order items are temporarily unavailable." : "No item details were saved for this order."}</p></div>`;
-    html += `<article class="orderCard" data-customer-order="${esc(o.id)}"><div class="orderCardTop"><div><span class="muted">ORDER NUMBER</span><b class="orderNumber">${esc(o.id.slice(0, 8).toUpperCase())}</b><small class="orderPlacedDate">${o.created_at ? new Date(o.created_at).toLocaleString() : ""}</small></div><span class="orderCurrentBadge">${esc(stage.label)}</span></div><div class="orderMetaGrid"><div><small>Order total</small><b>${money(o.total)}</b></div><div><small>Payment status</small><b class="paymentStatusText">${esc(o.payment_status || "Pending")}</b></div></div>${itemList}${renderOrderTimeline(stage)}<div class="orderInfo"><p><b>Tracking number:</b> ${esc(o.tracking_number || "Not assigned yet")}</p><p><b>Delivery address:</b> ${esc(o.delivery_address || "Not available")}</p></div>${pickup ? `<div class="pickupNotice"><b>📦 Your item may be ready for collection.</b><p>${esc(latest?.message || "Please check the latest shipment details before travelling to collect it.")}</p></div>` : ""}<div class="shipmentHistory"><h4>Shipment updates</h4>${updates.map((u) => `<div class="shipmentUpdateRow"><span class="shipmentUpdatePin">📍</span><div><b>${esc(u.status || "Update")}</b><p>${esc(u.message || "")}</p><small>${u.created_at ? new Date(u.created_at).toLocaleString() : ""}</small></div></div>`).join("") || `<p class="muted">${updatesError ? "Shipment updates are temporarily unavailable." : "No shipment updates yet. We’ll show new updates here as the store processes your order."}</p>`}</div><div class="orderActionRow"><button type="button" class="secondary" data-order-receipt="${esc(o.id)}">Download / Print receipt</button><button type="button" class="primary" data-order-reorder="${esc(o.id)}">Reorder items</button></div></article>`;
+    html += `<article class="orderCard" data-customer-order="${esc(o.id)}"><div class="orderCardTop"><div><span class="muted">ORDER NUMBER</span><b class="orderNumber">${esc(o.id.slice(0, 8).toUpperCase())}</b><small class="orderPlacedDate">${o.created_at ? new Date(o.created_at).toLocaleString() : ""}</small></div><span class="orderCurrentBadge">${esc(stage.label)}</span></div><div class="orderMetaGrid"><div><small>Order total</small><b>${money(o.total)}</b></div><div><small>Payment status</small><b class="paymentStatusText">${esc(o.payment_status || "Pending")}</b></div></div>${itemList}${renderOrderTimeline(stage)}<div class="orderInfo"><p><b>Expected delivery:</b> ${esc(expectedDeliveryText(o))}</p><p><b>Tracking number:</b> ${customerTrackingLink(o)}</p><p><b>Delivery address:</b> ${esc(o.delivery_address || "Not available")}</p></div>${returnWindowMarkup(o)}${pickup ? `<div class="pickupNotice"><b>📦 Your item may be ready for collection.</b><p>${esc(latest?.message || "Please check the latest shipment details before travelling to collect it.")}</p></div>` : ""}<div class="shipmentHistory"><h4>Shipment updates</h4>${updates.map((u) => `<div class="shipmentUpdateRow"><span class="shipmentUpdatePin">📍</span><div><b>${esc(u.status || "Update")}</b><p>${esc(u.message || "")}</p><small>${u.created_at ? new Date(u.created_at).toLocaleString() : ""}</small></div></div>`).join("") || `<p class="muted">${updatesError ? "Shipment updates are temporarily unavailable." : "No shipment updates yet. We’ll show new updates here as the store processes your order."}</p>`}</div><div class="orderActionRow"><button type="button" class="secondary" data-order-receipt="${esc(o.id)}">Download / Print receipt</button><button type="button" class="primary" data-order-reorder="${esc(o.id)}">Reorder items</button></div></article>`;
   }
   list.innerHTML = html;
+  refreshCustomerReturnCountdowns();
+  if (customerReturnCountdownTimer) clearInterval(customerReturnCountdownTimer);
+  customerReturnCountdownTimer = setInterval(refreshCustomerReturnCountdowns, 60000);
   applyOrderFilter("ongoing");
 }
 function printCustomerOrderReceipt(orderId) {
