@@ -327,55 +327,25 @@ function renderAdminProducts() {
   renderAdminProductList("chicken", "adminChickenProducts");
   renderAdminProductList("solar", "adminSolarProducts");
 }
-let adminOrderView = "ongoing";
-function adminOrderStatus(order) {
-  return String(order?.order_status || "processing").trim().toLowerCase().replace(/[_\s-]+/g, " ");
-}
-function isAdminCancelledOrder(order) {
-  return /^(cancelled|canceled|returned|refunded)$/.test(adminOrderStatus(order));
-}
 async function loadOrders() {
-  const box = $("adminOrders");
   const { data, error } = await sb
     .from("orders")
     .select("*")
     .order("created_at", { ascending: false });
   if (error) {
-    box.innerHTML = '<div class="summary">' + esc(error.message) + "</div>";
+    $("adminOrders").innerHTML =
+      '<div class="summary">' + esc(error.message) + "</div>";
     return;
   }
-  if (!$("adminOrderLayoutStyles")) {
-    const style = document.createElement("style");
-    style.id = "adminOrderLayoutStyles";
-    style.textContent = `
-      .adminOrderIntro h2{margin:0 0 5px}.adminOrderIntro p{margin:0;color:var(--muted)}
-      .adminOrderFilters{display:flex;gap:9px;flex-wrap:wrap;margin:16px 0}
-      .adminOrderFilters button{border:1px solid var(--line);background:var(--card,#fff);color:var(--ink);border-radius:12px;padding:11px 15px;font-weight:700;cursor:pointer}
-      .adminOrderFilters button.active{background:#111827;color:#fff;border-color:#111827}
-      .adminOrderFilters button span{display:inline-grid;place-items:center;min-width:23px;height:23px;margin-left:6px;padding:0 6px;border-radius:20px;background:#e5e7eb;color:#111827;font-size:12px}
-      .adminOrderSection h3{margin:14px 0}
-      body.dark .adminOrderFilters button{background:#111c2d;color:var(--ink);border-color:var(--line)}
-      body.dark .adminOrderFilters button.active{background:#e5e7eb;color:#111827}
-    `;
-    document.head.appendChild(style);
-  }
-  const orders = data || [];
-  const cancelledOrders = orders.filter(isAdminCancelledOrder);
-  const ongoingOrders = orders.filter(o => !isAdminCancelledOrder(o));
-  const renderCards = rows => rows.map(o => {
-    const expected = o.expected_delivery_date
-      ? new Date(`${o.expected_delivery_date}T00:00:00`).toLocaleDateString("en-NG", { dateStyle: "medium" })
-      : "Not set";
-    return `<div class="orderCard"><b>Order ${o.id.slice(0, 8)}</b> <p>${esc(o.customer_name)} · ${esc(o.customer_phone)} · ${money(o.total)}</p> <p>Payment: <span class="status">${esc(o.payment_status)}</span> · Shipment: <span class="status">${esc(o.order_status)}</span></p> <p>Expected delivery: <b>${esc(expected)}</b></p><p>Tracking: ${esc(o.tracking_number || "Not assigned")}</p><p>Address: ${esc(o.delivery_address)}</p>${specialRequestHtml(o)}${rewardsInfoHtml(o)} <button class="primary" data-order="${o.id}">Manage Order & Shipment</button></div>`;
-  }).join("") || '<div class="summary">No orders in this section.</div>';
-  box.innerHTML = `
-    <div class="adminOrderIntro"><h2>📦 Order Management</h2><p>Orders are separated automatically according to the shipment status you set.</p></div>
-    <div class="adminOrderFilters" role="tablist" aria-label="Order categories">
-      <button type="button" class="${adminOrderView === "ongoing" ? "active" : ""}" data-admin-order-view="ongoing">Ongoing Orders <span>${ongoingOrders.length}</span></button>
-      <button type="button" class="${adminOrderView === "cancelled" ? "active" : ""}" data-admin-order-view="cancelled">Cancelled / Returned <span>${cancelledOrders.length}</span></button>
-    </div>
-    <section class="adminOrderSection ${adminOrderView === "ongoing" ? "" : "hidden"}" data-admin-order-section="ongoing"><h3>Ongoing Orders</h3>${renderCards(ongoingOrders)}</section>
-    <section class="adminOrderSection ${adminOrderView === "cancelled" ? "" : "hidden"}" data-admin-order-section="cancelled"><h3>Cancelled / Returned Orders</h3>${renderCards(cancelledOrders)}</section>`;
+  $("adminOrders").innerHTML =
+    (data || [])
+      .map((o) => {
+        const expected = o.expected_delivery_date
+          ? new Date(`${o.expected_delivery_date}T00:00:00`).toLocaleDateString("en-NG", { dateStyle: "medium" })
+          : "Not set";
+        return `<div class="orderCard"><b>Order ${o.id.slice(0, 8)}</b> <p>${esc(o.customer_name)} · ${esc(o.customer_phone)} · ${money(o.total)}</p> <p>Payment: <span class="status">${esc(o.payment_status)}</span> · Shipment: <span class="status">${esc(o.order_status)}</span></p> <p>Expected delivery: <b>${esc(expected)}</b></p><p>Tracking: ${esc(o.tracking_number || "Not assigned")}</p><p>Address: ${esc(o.delivery_address)}</p>${specialRequestHtml(o)}${rewardsInfoHtml(o)} <button class="primary" data-order="${o.id}">Manage Order & Shipment</button></div>`;
+      })
+      .join("") || '<div class="summary">No orders yet.</div>';
 }
 function openProduct(p, defaultDepartment = "general") {
   $("productModalTitle").textContent = p ? "Edit Product" : "Add Product";
@@ -550,7 +520,7 @@ async function manageOrder(id) {
     .select("*")
     .eq("order_id", id)
     .order("created_at", { ascending: false });
-  $("orderModalBody").innerHTML = `<h2>Manage Order ${id.slice(0, 8)}</h2><p>${esc(o.customer_name)} · ${esc(o.customer_phone)}</p><p>${esc(o.delivery_address)}</p>${specialRequestHtml(o)}<h3>Payment & Rewards</h3>${rewardsInfoHtml(o)}<h3>Ordered products</h3>${orderedProductsHtml}<label>Payment status<select id="mPay"><option ${o.payment_status === "pending" ? "selected" : ""}>pending</option><option ${o.payment_status === "paid" ? "selected" : ""}>paid</option><option ${o.payment_status === "failed" ? "selected" : ""}>failed</option><option ${o.payment_status === "refunded" ? "selected" : ""}>refunded</option></select></label><label>Shipment status<select id="mStatus">${["processing", "confirmed", "shipped", "out_for_delivery", "delivered", "cancelled", "returned"].map(s => `<option value="${s}" ${o.order_status === s ? "selected" : ""}>${s.replace(/_/g, " ")}</option>`).join("")}</select></label><label>Expected delivery date<input id="mExpectedDelivery" type="date" value="${esc(o.expected_delivery_date || "")}"></label><label>Tracking number<input id="mTrack" value="${esc(o.tracking_number || "")}" placeholder="Enter carrier tracking number"></label><label>Tracking website link<input id="mTrackingUrl" type="url" value="${esc(o.tracking_url || "")}" placeholder="https://carrier.com/track/..."></label><p class="muted">Paste the carrier's full tracking URL. Customers will be able to tap their tracking number to open it.</p><label>Shipment update<textarea id="mMessage" placeholder="e.g. Package has left Abuja sorting centre"></textarea></label><label>Location<input id="mLocation" placeholder="e.g. Abuja"></label><div class="baMapPicker"><button type="button" class="secondary" id="toggleShipmentMap">＋ Add map location (optional)</button><div id="shipmentMapPanel" class="hidden"><p class="muted">Search for the driver's confirmed location or tap the map to place the green marker. You can leave this empty.</p><div class="baMapSearch"><input id="shipmentMapSearch" type="search" placeholder="Search a place, area or address"><button type="button" class="secondary" id="searchShipmentMap">Search</button><button type="button" class="secondary" id="clearShipmentMap">Clear</button></div><div id="adminShipmentMap" class="baShipmentMap"></div><small id="shipmentMapSelected" class="muted">No map location selected.</small><input type="hidden" id="mMapLat"><input type="hidden" id="mMapLng"></div></div><button class="primary" id="saveOrder">Save Update</button><h3>Shipment history</h3>${(ups || []).map(u => `<div class="summary">📍 <b>${esc(u.status)}</b> — ${esc(u.message)}<br><span class="muted">${esc(u.location || "")} ${new Date(u.created_at).toLocaleString()}</span></div>`).join("") || '<p class="muted">No shipment updates yet.</p>'}`;
+  $("orderModalBody").innerHTML = `<h2>Manage Order ${id.slice(0, 8)}</h2><p>${esc(o.customer_name)} · ${esc(o.customer_phone)}</p><p>${esc(o.delivery_address)}</p>${specialRequestHtml(o)}<h3>Payment & Rewards</h3>${rewardsInfoHtml(o)}<h3>Ordered products</h3>${orderedProductsHtml}<label>Payment status<select id="mPay"><option ${o.payment_status === "pending" ? "selected" : ""}>pending</option><option ${o.payment_status === "paid" ? "selected" : ""}>paid</option><option ${o.payment_status === "failed" ? "selected" : ""}>failed</option><option ${o.payment_status === "refunded" ? "selected" : ""}>refunded</option></select></label><label>Shipment status<select id="mStatus">${["processing", "confirmed", "shipped", "out_for_delivery", "delivered", "cancelled"].map(s => `<option value="${s}" ${o.order_status === s ? "selected" : ""}>${s}</option>`).join("")}</select></label><label>Expected delivery date<input id="mExpectedDelivery" type="date" value="${esc(o.expected_delivery_date || "")}"></label><label>Tracking number<input id="mTrack" value="${esc(o.tracking_number || "")}" placeholder="Enter carrier tracking number"></label><label>Tracking website link<input id="mTrackingUrl" type="url" value="${esc(o.tracking_url || "")}" placeholder="https://carrier.com/track/..."></label><p class="muted">Paste the carrier's full tracking URL. Customers will be able to tap their tracking number to open it.</p><label>Shipment update<textarea id="mMessage" placeholder="e.g. Package has left Abuja sorting centre"></textarea></label><label>Location<input id="mLocation" placeholder="e.g. Abuja"></label><div class="baMapPicker"><button type="button" class="secondary" id="toggleShipmentMap">＋ Add map location (optional)</button><div id="shipmentMapPanel" class="hidden"><p class="muted">Search for the driver's confirmed location or tap the map to place the green marker. You can leave this empty.</p><div class="baMapSearch"><input id="shipmentMapSearch" type="search" placeholder="Search a place, area or address"><button type="button" class="secondary" id="searchShipmentMap">Search</button><button type="button" class="secondary" id="clearShipmentMap">Clear</button></div><div id="adminShipmentMap" class="baShipmentMap"></div><small id="shipmentMapSelected" class="muted">No map location selected.</small><input type="hidden" id="mMapLat"><input type="hidden" id="mMapLng"></div></div><button class="primary" id="saveOrder">Save Update</button><h3>Shipment history</h3>${(ups || []).map(u => `<div class="summary">📍 <b>${esc(u.status)}</b> — ${esc(u.message)}<br><span class="muted">${esc(u.location || "")} ${new Date(u.created_at).toLocaleString()}</span></div>`).join("") || '<p class="muted">No shipment updates yet.</p>'}`;
   $("saveOrder").onclick = async () => {
     const nextStatus = $("mStatus").value;
     const trackingUrlInput = $("mTrackingUrl").value.trim();
@@ -632,6 +602,57 @@ async function manageOrder(id) {
   $("orderModal").classList.remove("hidden");
   setupAdminShipmentMap();
 }
+
+const ADMIN_AVATAR_BUCKET = "admin-avatars";
+
+async function loadAdminSettings() {
+  if (!adminUser || !sb) return;
+  $("adminAccountEmail").textContent = adminUser.email || "Email unavailable";
+  $("adminAccountId").textContent = adminUser.id;
+  $("adminAvatarMsg").textContent = "Loading your private profile photo…";
+  const { data, error } = await sb.storage.from(ADMIN_AVATAR_BUCKET).createSignedUrl(`${adminUser.id}/avatar`, 3600);
+  if (data?.signedUrl) {
+    $("adminAvatarPreview").src = data.signedUrl;
+    $("adminAvatarMsg").textContent = "Your private profile photo is loaded.";
+    $("removeAdminAvatar").disabled = false;
+  } else {
+    $("adminAvatarPreview").src = "images/logo.png";
+    $("adminAvatarMsg").textContent = error ? "No profile photo saved yet. Upload one below after the private storage setup." : "No profile photo saved yet.";
+    $("removeAdminAvatar").disabled = true;
+  }
+}
+$("adminAvatarFile")?.addEventListener("change", async () => {
+  const file = $("adminAvatarFile").files?.[0];
+  if (!file || !adminUser) return;
+  if (!["image/jpeg","image/png","image/webp"].includes(file.type)) { $("adminAvatarMsg").textContent = "Choose a PNG, JPG or WebP image."; return; }
+  if (file.size > 3 * 1024 * 1024) { $("adminAvatarMsg").textContent = "Image must be 3 MB or smaller."; return; }
+  $("adminAvatarMsg").textContent = "Uploading your private photo…";
+  const { error } = await sb.storage.from(ADMIN_AVATAR_BUCKET).upload(`${adminUser.id}/avatar`, file, {upsert:true,contentType:file.type,cacheControl:"3600"});
+  if (error) { $("adminAvatarMsg").textContent = `Upload failed: ${error.message}. Check the private avatar storage setup.`; return; }
+  await loadAdminSettings();
+  $("adminAvatarMsg").textContent = "Profile picture updated. It is private to your admin account.";
+});
+$("removeAdminAvatar")?.addEventListener("click", async () => {
+  if (!adminUser || !confirm("Remove your admin profile picture?")) return;
+  const { error } = await sb.storage.from(ADMIN_AVATAR_BUCKET).remove([`${adminUser.id}/avatar`]);
+  if (error) { $("adminAvatarMsg").textContent = `Could not remove photo: ${error.message}`; return; }
+  $("adminAvatarPreview").src = "images/logo.png";
+  $("adminAvatarMsg").textContent = "Profile picture removed.";
+  $("removeAdminAvatar").disabled = true;
+});
+$("adminPasswordForm")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const password = $("adminNewPassword").value;
+  const msg = $("adminPasswordMsg");
+  if (password.length < 8) { msg.textContent = "Use at least 8 characters."; return; }
+  if (password !== $("adminConfirmPassword").value) { msg.textContent = "The passwords do not match."; return; }
+  msg.textContent = "Updating password…";
+  const { error } = await sb.auth.updateUser({password});
+  if (error) { msg.textContent = `Password was not changed: ${error.message}`; return; }
+  $("adminPasswordForm").reset();
+  msg.textContent = "Your admin password has been updated successfully.";
+});
+
 document.addEventListener("click", async (e) => {
   const t = e.target.closest("button") || e.target;
   if (t.dataset.readNotification) {
@@ -649,6 +670,8 @@ document.addEventListener("click", async (e) => {
     $("reviewsTab").classList.toggle("hidden", t.dataset.tab !== "reviews");
     $("rewardsTab").classList.toggle("hidden", t.dataset.tab !== "rewards");
     $("analyticsTab").classList.toggle("hidden", t.dataset.tab !== "analytics");
+    $("settingsTab").classList.toggle("hidden", t.dataset.tab !== "settings");
+    if (t.dataset.tab === "settings") await loadAdminSettings();
     if (t.dataset.tab === "reviews") await loadReviews();
     if (t.dataset.tab === "rewards") await loadRewardsAdmin();
     if (t.dataset.tab === "analytics") await loadAnalytics();
@@ -667,11 +690,6 @@ document.addEventListener("click", async (e) => {
     if (data) openProduct(data);
   }
   if (t.dataset.delete) deleteProduct(t.dataset.delete);
-  if (t.dataset.adminOrderView) {
-    adminOrderView = t.dataset.adminOrderView;
-    document.querySelectorAll("[data-admin-order-view]").forEach(button => button.classList.toggle("active", button.dataset.adminOrderView === adminOrderView));
-    document.querySelectorAll("[data-admin-order-section]").forEach(section => section.classList.toggle("hidden", section.dataset.adminOrderSection !== adminOrderView));
-  }
   if (t.dataset.order) manageOrder(t.dataset.order);
   if (t.dataset.close) $(t.dataset.close).classList.add("hidden");
 });
