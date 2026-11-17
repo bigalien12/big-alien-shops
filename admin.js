@@ -327,25 +327,55 @@ function renderAdminProducts() {
   renderAdminProductList("chicken", "adminChickenProducts");
   renderAdminProductList("solar", "adminSolarProducts");
 }
+let adminOrderView = "ongoing";
+function adminOrderStatus(order) {
+  return String(order?.order_status || "processing").trim().toLowerCase().replace(/[_\s-]+/g, " ");
+}
+function isAdminCancelledOrder(order) {
+  return /^(cancelled|canceled|returned|refunded)$/.test(adminOrderStatus(order));
+}
 async function loadOrders() {
+  const box = $("adminOrders");
   const { data, error } = await sb
     .from("orders")
     .select("*")
     .order("created_at", { ascending: false });
   if (error) {
-    $("adminOrders").innerHTML =
-      '<div class="summary">' + esc(error.message) + "</div>";
+    box.innerHTML = '<div class="summary">' + esc(error.message) + "</div>";
     return;
   }
-  $("adminOrders").innerHTML =
-    (data || [])
-      .map((o) => {
-        const expected = o.expected_delivery_date
-          ? new Date(`${o.expected_delivery_date}T00:00:00`).toLocaleDateString("en-NG", { dateStyle: "medium" })
-          : "Not set";
-        return `<div class="orderCard"><b>Order ${o.id.slice(0, 8)}</b> <p>${esc(o.customer_name)} · ${esc(o.customer_phone)} · ${money(o.total)}</p> <p>Payment: <span class="status">${esc(o.payment_status)}</span> · Shipment: <span class="status">${esc(o.order_status)}</span></p> <p>Expected delivery: <b>${esc(expected)}</b></p><p>Tracking: ${esc(o.tracking_number || "Not assigned")}</p><p>Address: ${esc(o.delivery_address)}</p>${specialRequestHtml(o)}${rewardsInfoHtml(o)} <button class="primary" data-order="${o.id}">Manage Order & Shipment</button></div>`;
-      })
-      .join("") || '<div class="summary">No orders yet.</div>';
+  if (!$("adminOrderLayoutStyles")) {
+    const style = document.createElement("style");
+    style.id = "adminOrderLayoutStyles";
+    style.textContent = `
+      .adminOrderIntro h2{margin:0 0 5px}.adminOrderIntro p{margin:0;color:var(--muted)}
+      .adminOrderFilters{display:flex;gap:9px;flex-wrap:wrap;margin:16px 0}
+      .adminOrderFilters button{border:1px solid var(--line);background:var(--card,#fff);color:var(--ink);border-radius:12px;padding:11px 15px;font-weight:700;cursor:pointer}
+      .adminOrderFilters button.active{background:#111827;color:#fff;border-color:#111827}
+      .adminOrderFilters button span{display:inline-grid;place-items:center;min-width:23px;height:23px;margin-left:6px;padding:0 6px;border-radius:20px;background:#e5e7eb;color:#111827;font-size:12px}
+      .adminOrderSection h3{margin:14px 0}
+      body.dark .adminOrderFilters button{background:#111c2d;color:var(--ink);border-color:var(--line)}
+      body.dark .adminOrderFilters button.active{background:#e5e7eb;color:#111827}
+    `;
+    document.head.appendChild(style);
+  }
+  const orders = data || [];
+  const cancelledOrders = orders.filter(isAdminCancelledOrder);
+  const ongoingOrders = orders.filter(o => !isAdminCancelledOrder(o));
+  const renderCards = rows => rows.map(o => {
+    const expected = o.expected_delivery_date
+      ? new Date(`${o.expected_delivery_date}T00:00:00`).toLocaleDateString("en-NG", { dateStyle: "medium" })
+      : "Not set";
+    return `<div class="orderCard"><b>Order ${o.id.slice(0, 8)}</b> <p>${esc(o.customer_name)} · ${esc(o.customer_phone)} · ${money(o.total)}</p> <p>Payment: <span class="status">${esc(o.payment_status)}</span> · Shipment: <span class="status">${esc(o.order_status)}</span></p> <p>Expected delivery: <b>${esc(expected)}</b></p><p>Tracking: ${esc(o.tracking_number || "Not assigned")}</p><p>Address: ${esc(o.delivery_address)}</p>${specialRequestHtml(o)}${rewardsInfoHtml(o)} <button class="primary" data-order="${o.id}">Manage Order & Shipment</button></div>`;
+  }).join("") || '<div class="summary">No orders in this section.</div>';
+  box.innerHTML = `
+    <div class="adminOrderIntro"><h2>📦 Order Management</h2><p>Orders are separated automatically according to the shipment status you set.</p></div>
+    <div class="adminOrderFilters" role="tablist" aria-label="Order categories">
+      <button type="button" class="${adminOrderView === "ongoing" ? "active" : ""}" data-admin-order-view="ongoing">Ongoing Orders <span>${ongoingOrders.length}</span></button>
+      <button type="button" class="${adminOrderView === "cancelled" ? "active" : ""}" data-admin-order-view="cancelled">Cancelled / Returned <span>${cancelledOrders.length}</span></button>
+    </div>
+    <section class="adminOrderSection ${adminOrderView === "ongoing" ? "" : "hidden"}" data-admin-order-section="ongoing"><h3>Ongoing Orders</h3>${renderCards(ongoingOrders)}</section>
+    <section class="adminOrderSection ${adminOrderView === "cancelled" ? "" : "hidden"}" data-admin-order-section="cancelled"><h3>Cancelled / Returned Orders</h3>${renderCards(cancelledOrders)}</section>`;
 }
 function openProduct(p, defaultDepartment = "general") {
   $("productModalTitle").textContent = p ? "Edit Product" : "Add Product";
@@ -450,10 +480,6 @@ async function deleteProduct(id) {
 }
 let baAdminShipmentMap = null;
 let baAdminShipmentMarker = null;
-let baAdminCurrentOrderId = null;
-function bigAlienMapTrackingNumber(orderId) {
-  return `BA-MAP-${String(orderId).replace(/-/g, "").slice(0, 8).toUpperCase()}`;
-}
 function setupAdminShipmentMap() {
   const toggle = $("toggleShipmentMap");
   const panel = $("shipmentMapPanel");
@@ -467,12 +493,6 @@ function setupAdminShipmentMap() {
         baAdminShipmentMap = L.map("adminShipmentMap").setView([9.082, 8.675], 6);
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" }).addTo(baAdminShipmentMap);
         baAdminShipmentMap.on("click", (event) => setAdminShipmentPin(event.latlng.lat, event.latlng.lng));
-        const savedLat = Number($("mMapLat")?.value);
-        const savedLng = Number($("mMapLng")?.value);
-        if (Number.isFinite(savedLat) && Number.isFinite(savedLng) && $("mMapLat")?.value && $("mMapLng")?.value) {
-          baAdminShipmentMap.setView([savedLat, savedLng], 15);
-          setAdminShipmentPin(savedLat, savedLng);
-        }
       }
       setTimeout(() => baAdminShipmentMap.invalidateSize(), 120);
     }
@@ -495,17 +515,10 @@ function setupAdminShipmentMap() {
     if (baAdminShipmentMarker) baAdminShipmentMap.removeLayer(baAdminShipmentMarker);
     baAdminShipmentMarker = null;
     $("mMapLat").value = ""; $("mMapLng").value = "";
-    const trackingInput = $("mTrack");
-    if (trackingInput && baAdminCurrentOrderId && trackingInput.value === bigAlienMapTrackingNumber(baAdminCurrentOrderId)) trackingInput.value = "";
     $("shipmentMapSelected").textContent = "No map location selected.";
   };
 }
 function setAdminShipmentPin(lat, lng) {
-  // Selecting a confirmed map pin automatically creates the BIG ALIEN map-tracking ID.
-  const trackingInput = $("mTrack");
-  if (trackingInput && !trackingInput.value.trim() && baAdminCurrentOrderId) {
-    trackingInput.value = bigAlienMapTrackingNumber(baAdminCurrentOrderId);
-  }
   $("mMapLat").value = Number(lat).toFixed(6);
   $("mMapLng").value = Number(lng).toFixed(6);
   if (baAdminShipmentMarker) baAdminShipmentMarker.setLatLng([lat, lng]);
@@ -514,10 +527,6 @@ function setAdminShipmentPin(lat, lng) {
 }
 
 async function manageOrder(id) {
-  baAdminCurrentOrderId = id;
-  // The order modal replaces its map element each time, so dispose of the old Leaflet instance first.
-  if (baAdminShipmentMap) { baAdminShipmentMap.remove(); baAdminShipmentMap = null; }
-  baAdminShipmentMarker = null;
   const { data: o, error } = await sb
     .from("orders")
     .select("*")
@@ -541,17 +550,7 @@ async function manageOrder(id) {
     .select("*")
     .eq("order_id", id)
     .order("created_at", { ascending: false });
-  $("orderModalBody").innerHTML = `<h2>Manage Order ${id.slice(0, 8)}</h2><p>${esc(o.customer_name)} · ${esc(o.customer_phone)}</p><p>${esc(o.delivery_address)}</p>${specialRequestHtml(o)}<h3>Payment & Rewards</h3>${rewardsInfoHtml(o)}<h3>Ordered products</h3>${orderedProductsHtml}<label>Payment status<select id="mPay"><option ${o.payment_status === "pending" ? "selected" : ""}>pending</option><option ${o.payment_status === "paid" ? "selected" : ""}>paid</option><option ${o.payment_status === "failed" ? "selected" : ""}>failed</option><option ${o.payment_status === "refunded" ? "selected" : ""}>refunded</option></select></label><label>Shipment status<select id="mStatus">${["processing", "confirmed", "shipped", "out_for_delivery", "delivered", "cancelled"].map(s => `<option value="${s}" ${o.order_status === s ? "selected" : ""}>${s}</option>`).join("")}</select></label><label>Expected delivery date<input id="mExpectedDelivery" type="date" value="${esc(o.expected_delivery_date || "")}"></label><label>Tracking number<input id="mTrack" value="${esc(o.tracking_number || "")}" placeholder="Enter carrier tracking number"></label><label>Tracking website link<input id="mTrackingUrl" type="url" value="${esc(o.tracking_url || "")}" placeholder="https://carrier.com/track/..."></label><p class="muted">The tracking number opens the BIG ALIEN map when you add a confirmed location. The carrier link remains available separately.</p><label>Shipment update<textarea id="mMessage" placeholder="e.g. Package has left Abuja sorting centre"></textarea></label><label>Location<input id="mLocation" placeholder="e.g. Abuja"></label><div class="baMapPicker"><button type="button" class="secondary" id="toggleShipmentMap">＋ Add map location (optional)</button><div id="shipmentMapPanel" class="hidden"><p class="muted">Search for the driver's confirmed location or tap the map to place the green marker. You can leave this empty.</p><div class="baMapSearch"><input id="shipmentMapSearch" type="search" placeholder="Search a place, area or address"><button type="button" class="secondary" id="searchShipmentMap">Search</button><button type="button" class="secondary" id="clearShipmentMap">Clear</button></div><div id="adminShipmentMap" class="baShipmentMap"></div><small id="shipmentMapSelected" class="muted">No map location selected.</small><input type="hidden" id="mMapLat"><input type="hidden" id="mMapLng"></div></div><button class="primary" id="saveOrder">Save Update</button><h3>Shipment history</h3>${(ups || []).map(u => `<div class="summary">📍 <b>${esc(u.status)}</b> — ${esc(u.message)}<br><span class="muted">${esc(u.location || "")} ${new Date(u.created_at).toLocaleString()}</span></div>`).join("") || '<p class="muted">No shipment updates yet.</p>'}`;
-  // Restore the latest previously confirmed map pin when reopening an order.
-  // This lets older test orders receive their automatic BIG ALIEN map-tracking ID on save.
-  const savedMapUpdate = (ups || []).find((u) => u.latitude != null && u.longitude != null && u.latitude !== "" && u.longitude !== "");
-  if (savedMapUpdate) {
-    $("mMapLat").value = String(savedMapUpdate.latitude);
-    $("mMapLng").value = String(savedMapUpdate.longitude);
-    if (!$("mTrack").value.trim()) $("mTrack").value = bigAlienMapTrackingNumber(id);
-    $("shipmentMapSelected").textContent = `Previously confirmed map pin: ${Number(savedMapUpdate.latitude).toFixed(5)}, ${Number(savedMapUpdate.longitude).toFixed(5)}`;
-  }
-
+  $("orderModalBody").innerHTML = `<h2>Manage Order ${id.slice(0, 8)}</h2><p>${esc(o.customer_name)} · ${esc(o.customer_phone)}</p><p>${esc(o.delivery_address)}</p>${specialRequestHtml(o)}<h3>Payment & Rewards</h3>${rewardsInfoHtml(o)}<h3>Ordered products</h3>${orderedProductsHtml}<label>Payment status<select id="mPay"><option ${o.payment_status === "pending" ? "selected" : ""}>pending</option><option ${o.payment_status === "paid" ? "selected" : ""}>paid</option><option ${o.payment_status === "failed" ? "selected" : ""}>failed</option><option ${o.payment_status === "refunded" ? "selected" : ""}>refunded</option></select></label><label>Shipment status<select id="mStatus">${["processing", "confirmed", "shipped", "out_for_delivery", "delivered", "cancelled", "returned"].map(s => `<option value="${s}" ${o.order_status === s ? "selected" : ""}>${s.replace(/_/g, " ")}</option>`).join("")}</select></label><label>Expected delivery date<input id="mExpectedDelivery" type="date" value="${esc(o.expected_delivery_date || "")}"></label><label>Tracking number<input id="mTrack" value="${esc(o.tracking_number || "")}" placeholder="Enter carrier tracking number"></label><label>Tracking website link<input id="mTrackingUrl" type="url" value="${esc(o.tracking_url || "")}" placeholder="https://carrier.com/track/..."></label><p class="muted">Paste the carrier's full tracking URL. Customers will be able to tap their tracking number to open it.</p><label>Shipment update<textarea id="mMessage" placeholder="e.g. Package has left Abuja sorting centre"></textarea></label><label>Location<input id="mLocation" placeholder="e.g. Abuja"></label><div class="baMapPicker"><button type="button" class="secondary" id="toggleShipmentMap">＋ Add map location (optional)</button><div id="shipmentMapPanel" class="hidden"><p class="muted">Search for the driver's confirmed location or tap the map to place the green marker. You can leave this empty.</p><div class="baMapSearch"><input id="shipmentMapSearch" type="search" placeholder="Search a place, area or address"><button type="button" class="secondary" id="searchShipmentMap">Search</button><button type="button" class="secondary" id="clearShipmentMap">Clear</button></div><div id="adminShipmentMap" class="baShipmentMap"></div><small id="shipmentMapSelected" class="muted">No map location selected.</small><input type="hidden" id="mMapLat"><input type="hidden" id="mMapLng"></div></div><button class="primary" id="saveOrder">Save Update</button><h3>Shipment history</h3>${(ups || []).map(u => `<div class="summary">📍 <b>${esc(u.status)}</b> — ${esc(u.message)}<br><span class="muted">${esc(u.location || "")} ${new Date(u.created_at).toLocaleString()}</span></div>`).join("") || '<p class="muted">No shipment updates yet.</p>'}`;
   $("saveOrder").onclick = async () => {
     const nextStatus = $("mStatus").value;
     const trackingUrlInput = $("mTrackingUrl").value.trim();
@@ -565,15 +564,11 @@ async function manageOrder(id) {
         return alert("Please enter a valid tracking website link starting with https://");
       }
     }
-    const hasConfirmedMapLocation = Boolean($("mMapLat").value && $("mMapLng").value);
-    const enteredTrackingNumber = $("mTrack").value.trim();
-    const savedTrackingNumber = enteredTrackingNumber || (hasConfirmedMapLocation ? bigAlienMapTrackingNumber(id) : null);
-    if (savedTrackingNumber) $("mTrack").value = savedTrackingNumber;
     const orderUpdate = {
       payment_status: $("mPay").value,
       order_status: nextStatus,
       expected_delivery_date: $("mExpectedDelivery").value || null,
-      tracking_number: savedTrackingNumber,
+      tracking_number: $("mTrack").value.trim() || null,
       tracking_url: normalizedTrackingUrl,
     };
     // Record the first time the order is marked delivered. Do not restart the 3-day window on later edits.
@@ -672,6 +667,11 @@ document.addEventListener("click", async (e) => {
     if (data) openProduct(data);
   }
   if (t.dataset.delete) deleteProduct(t.dataset.delete);
+  if (t.dataset.adminOrderView) {
+    adminOrderView = t.dataset.adminOrderView;
+    document.querySelectorAll("[data-admin-order-view]").forEach(button => button.classList.toggle("active", button.dataset.adminOrderView === adminOrderView));
+    document.querySelectorAll("[data-admin-order-section]").forEach(section => section.classList.toggle("hidden", section.dataset.adminOrderSection !== adminOrderView));
+  }
   if (t.dataset.order) manageOrder(t.dataset.order);
   if (t.dataset.close) $(t.dataset.close).classList.add("hidden");
 });
