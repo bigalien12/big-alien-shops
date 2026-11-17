@@ -1564,14 +1564,19 @@ async function reorderCustomerOrder(orderId) {
 }
 
 function applyOrderFilter(filter) {
-  document.querySelectorAll("[data-order-filter]").forEach(b => b.classList.toggle("active", b.dataset.orderFilter === filter));
+  document.querySelectorAll("[data-order-filter]").forEach(button => {
+    button.classList.toggle("active", button.dataset.orderFilter === filter);
+  });
+
   document.querySelectorAll("#ordersList .orderCard").forEach(card => {
-    // Use only the admin-saved order status, never descriptive card text.
-    // This keeps Delivered cards out of Cancelled / Returned even when they
-    // contain return-window guidance.
-    const status = String(card.dataset.orderStatus || "").trim().toLowerCase().replace(/[_\s-]+/g, " ");
-    const cancelled = /^(cancelled?|canceled|returned?|return(?: requested| approved)?|refunded)(?:$|\b)/.test(status);
-    card.classList.toggle("hidden", filter === "cancelled" ? !cancelled : cancelled);
+    // Classification comes only from the order status saved by the admin.
+    // Do not inspect card text: Delivered cards mention the return window.
+    const status = String(card.dataset.orderStatus || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[_\s-]+/g, " ");
+    const isCancelledOrReturned = /(^|\b)(cancelled|canceled|returned|refunded)(\b|$)/.test(status);
+    card.classList.toggle("hidden", filter === "cancelled" ? !isCancelledOrReturned : isCancelledOrReturned);
   });
 }
 
