@@ -1566,11 +1566,11 @@ async function reorderCustomerOrder(orderId) {
 function applyOrderFilter(filter) {
   document.querySelectorAll("[data-order-filter]").forEach(b => b.classList.toggle("active", b.dataset.orderFilter === filter));
   document.querySelectorAll("#ordersList .orderCard").forEach(card => {
-    // Use only the saved order_status, never the card's full text. Delivered
-    // cards contain return-window guidance, which must not classify them as
-    // cancelled or returned orders.
-    const status = String(card.dataset.orderStatus || "").trim().toLowerCase().replace(/[_\\s-]+/g, " ");
-    const cancelled = /^(cancelled?|canceled|returned|refunded)(?:\\b|\\s|\/)/.test(status);
+    // Use only the admin-saved order status, never descriptive card text.
+    // This keeps Delivered cards out of Cancelled / Returned even when they
+    // contain return-window guidance.
+    const status = String(card.dataset.orderStatus || "").trim().toLowerCase().replace(/[_\s-]+/g, " ");
+    const cancelled = /^(cancelled?|canceled|returned?|return(?: requested| approved)?|refunded)(?:$|\b)/.test(status);
     card.classList.toggle("hidden", filter === "cancelled" ? !cancelled : cancelled);
   });
 }
