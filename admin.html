@@ -46,16 +46,22 @@
 .adminAvatarUpload{display:inline-block;padding:11px 16px;border-radius:10px;background:#0866f5;color:white;font-weight:700;cursor:pointer}
 .adminSettingsCard .checkout{max-width:520px}body.dark .adminSettingsCard{background:#111c2d;color:var(--ink)}
 @media(max-width:480px){.adminSettingsCard{padding:14px}#adminAvatarPreview{width:84px;height:84px}}
+
+.adminSettingsActions{display:grid;gap:10px}
+.adminSettingsAction{width:100%;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-start;gap:8px;text-align:left;padding:14px 16px;border-radius:12px;min-height:54px}
+.adminSettingsHint{display:block;flex-basis:100%;margin-left:28px;font-size:12px;font-weight:400;opacity:.78}
+.adminLogoutCard{border:1px solid #fecaca}
+.adminLogoutAction{width:100%;padding:14px 16px;border:1px solid #ef4444;border-radius:12px;background:#fff1f2;color:#b91c1c;font-weight:800;text-align:left;cursor:pointer}
+body.dark .adminLogoutCard{border-color:#7f1d1d}
+body.dark .adminLogoutAction{background:#351b24;color:#fecaca;border-color:#9f3548}
+@media(max-width:600px){.adminSettingsAction,.adminLogoutAction{min-height:58px;padding:13px}.adminSettingsHint{margin-left:0}}
 </style>\n</head>
 <body>
 <header class="top">
   <div class="notice">👑 <b>Big Alien Venture Admin</b> · Owner dashboard</div>
   <div class="adminNav">
     <a class="brand" href="./"><img src="images/logo.png" alt="Big Alien Venture logo"><span>BIG ALIEN ADMIN</span></a>
-    <button class="secondary" id="adminMessagesBtn" type="button">🔔 Messages <span id="adminUnreadCount" class="notificationBadge">0</span></button>
-<button class="secondary" id="enablePushNotifications" type="button">🔔 Enable Push Notifications</button>
-    <button class="secondary" id="backHome">← Store</button>
-    <button class="secondary" id="adminLogout">Logout</button>
+
   </div>
 </header>
 <main class="adminPage">
@@ -91,6 +97,12 @@
  <div class="adminSettingsCard"><h3>Owner Profile Picture</h3><div class="adminAvatarRow"><img id="adminAvatarPreview" src="images/logo.png" alt="Private admin profile picture"><div><label class="adminAvatarUpload">Choose Photo<input id="adminAvatarFile" type="file" accept="image/png,image/jpeg,image/webp" hidden></label><p class="small muted">PNG, JPG or WebP · Maximum 3 MB</p><button class="secondary" id="removeAdminAvatar" type="button">Remove Photo</button></div></div><p id="adminAvatarMsg" class="small" aria-live="polite"></p></div>
  <div class="adminSettingsCard"><h3>Change Password</h3><form id="adminPasswordForm" class="checkout"><label>New password<input id="adminNewPassword" type="password" minlength="8" autocomplete="new-password" required></label><label>Confirm new password<input id="adminConfirmPassword" type="password" minlength="8" autocomplete="new-password" required></label><button class="primary" type="submit">Update Password</button><p id="adminPasswordMsg" class="small" aria-live="polite"></p></form></div>
  <div class="adminSettingsCard"><h3>Account Information</h3><p><b>Email address</b><br><span id="adminAccountEmail">Loading…</span></p><p><b>Account ID</b><br><span id="adminAccountId" class="small muted"></span></p><p class="small muted">Your email is shown for reference. Password changes apply to your signed-in Supabase admin account.</p></div>
+ <div class="adminSettingsCard adminSettingsActions"><h3>Admin Tools</h3><p class="small muted">Quick access to your store messages, phone notifications and customer marketplace.</p>
+  <button class="secondary adminSettingsAction" id="adminMessagesBtn" type="button">🔔 Messages <span id="adminUnreadCount" class="notificationBadge">0</span><span class="adminSettingsHint">View new orders and admin messages</span></button>
+  <button class="secondary adminSettingsAction" id="enablePushNotifications" type="button">📲 Enable Push Notifications<span class="adminSettingsHint">Allow order and payment alerts on this device</span></button>
+  <button class="secondary adminSettingsAction" id="backHome" type="button">🛍️ Go to Store<span class="adminSettingsHint">Open the customer marketplace</span></button>
+ </div>
+ <div class="adminSettingsCard adminLogoutCard"><h3>Sign out</h3><p class="small muted">Sign out of your private owner account on this device.</p><button class="adminLogoutAction" id="adminLogout" type="button">↪ Logout</button></div>
 </div>
 </section>
   </section>
