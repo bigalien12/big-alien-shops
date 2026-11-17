@@ -15,7 +15,11 @@
     .baMapSearch{display:flex;gap:8px;flex-wrap:wrap}.baMapSearch input{flex:1;min-width:150px}
     .customerShipmentMapWrap{margin-top:12px;padding:10px;border:1px solid var(--line);border-radius:12px}
     .customerShipmentMap{height:220px}.customerShipmentMapWrap>a{display:inline-block;margin-top:6px}
-  </style>
+  
+  #messagesTab .adminTitle{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0 18px}
+  #messagesTab .notificationPanel{display:block}
+
+</style>
 
 <style id="bigAlienAnalyticsStyles">
   .analyticsIntro{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0 16px}
@@ -70,8 +74,7 @@ body.dark .adminLogoutAction{background:#351b24;color:#fecaca;border-color:#9f35
   <section id="denied" class="summary hidden"><h2>Admin access required</h2><p>This account is signed in but does not have the admin role. Ask the store owner to authorize it.</p><button class="secondary" id="deniedLoginAgain" type="button">Use another account</button></section>
   <section id="adminApp" class="hidden">
     <div class="adminTitle"><div><h1>👑 Owner Dashboard</h1><p>Manage products, orders, payments and shipment updates.</p></div></div>
-    <section id="adminMessagesPanel" class="notificationPanel hidden" aria-labelledby="adminMessagesTitle"><div class="notificationPanelHead"><h2 id="adminMessagesTitle">Admin Notifications</h2><button class="secondary" id="refreshAdminMessages" type="button">Refresh</button></div><div id="adminMessages"><p class="notificationEmpty">New orders and customer payment reports will appear here.</p></div></section>
-    <div class="adminTabs"><button class="active" data-tab="products">General Products</button><button data-tab="chicken">🐔 Chicken Shop</button><button data-tab="solar">☀️ Solar Shop</button><button data-tab="orders">Orders & Shipment</button><button data-tab="reviews">Customer Reviews</button><button data-tab="rewards">Customer Rewards</button><button data-tab="analytics">📊 Sales Analytics</button><button data-tab="settings">⚙️ Settings</button></div>
+<div class="adminTabs"><button class="active" data-tab="products">General Products</button><button data-tab="chicken">🐔 Chicken Shop</button><button data-tab="solar">☀️ Solar Shop</button><button data-tab="orders">Orders & Shipment</button><button data-tab="reviews">Customer Reviews</button><button data-tab="rewards">Customer Rewards</button><button data-tab="analytics">📊 Sales Analytics</button><button data-tab="settings">⚙️ Settings</button></div>
     <section id="productsTab">
       <div class="departmentAdminIntro generalAdminIntro"><h2>🛍️ General Store Products</h2><p>Manage the regular BIG ALIEN marketplace products here. Chicken and Solar have their own management pages.</p></div>
       <div class="adminActions"><button class="primary" type="button" id="addGeneralProductBtn">➕ Add General Product</button></div>
@@ -91,6 +94,10 @@ body.dark .adminLogoutAction{background:#351b24;color:#fecaca;border-color:#9f35
     <section id="reviewsTab" class="hidden"><div id="adminReviews"></div></section>
     <section id="rewardsTab" class="hidden"><div id="adminRewards"></div></section>
     <section id="analyticsTab" class="hidden"><div id="adminAnalytics"></div></section>
+    <section id="messagesTab" class="hidden">
+      <div class="adminTitle"><div><h1>🔔 Messages</h1><p>View new orders and admin notifications.</p></div><button class="secondary" id="backToSettings" type="button">← Back to Settings</button></div>
+    <section id="adminMessagesPanel" class="notificationPanel hidden" aria-labelledby="adminMessagesTitle"><div class="notificationPanelHead"><h2 id="adminMessagesTitle">Admin Notifications</h2><button class="secondary" id="refreshAdminMessages" type="button">Refresh</button></div><div id="adminMessages"><p class="notificationEmpty">New orders and customer payment reports will appear here.</p></div></section>
+        </section>
 <section id="settingsTab" class="hidden">
 <div class="adminSettingsWrap">
  <div><h2>⚙️ Admin Settings</h2><p class="muted">Manage your private owner profile and account security. Your photo is visible only inside this admin dashboard.</p></div>
@@ -113,7 +120,7 @@ body.dark .adminLogoutAction{background:#351b24;color:#fecaca;border-color:#9f35
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<script src="admin.js?v=13"></script>
+<script src="admin.js?v=14"></script>
   <script type="module" src="notifications.js"></script>
 </body>
 </html>

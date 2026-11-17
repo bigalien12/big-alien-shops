@@ -671,6 +671,7 @@ document.addEventListener("click", async (e) => {
     $("rewardsTab").classList.toggle("hidden", t.dataset.tab !== "rewards");
     $("analyticsTab").classList.toggle("hidden", t.dataset.tab !== "analytics");
     $("settingsTab").classList.toggle("hidden", t.dataset.tab !== "settings");
+    $("messagesTab").classList.toggle("hidden", t.dataset.tab !== "messages");
     if (t.dataset.tab === "settings") await loadAdminSettings();
     if (t.dataset.tab === "reviews") await loadReviews();
     if (t.dataset.tab === "rewards") await loadRewardsAdmin();
@@ -695,8 +696,19 @@ document.addEventListener("click", async (e) => {
 });
 if ($("adminMessagesBtn"))
   $("adminMessagesBtn").onclick = async () => {
-    $("adminMessagesPanel").classList.toggle("hidden");
+    ["productsTab", "chickenTab", "solarTab", "ordersTab", "reviewsTab", "rewardsTab", "analyticsTab", "settingsTab"].forEach((id) => $(id)?.classList.add("hidden"));
+    $("messagesTab")?.classList.remove("hidden");
+    $("adminMessagesPanel")?.classList.remove("hidden");
+    document.querySelectorAll("[data-tab]").forEach((x) => x.classList.remove("active"));
     await loadNotifications();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+if ($("backToSettings"))
+  $("backToSettings").onclick = async () => {
+    $("messagesTab")?.classList.add("hidden");
+    $("settingsTab")?.classList.remove("hidden");
+    await loadAdminSettings();
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 if ($("refreshAdminMessages"))
   $("refreshAdminMessages").onclick = loadNotifications;

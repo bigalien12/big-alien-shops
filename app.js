@@ -328,45 +328,13 @@ function renderDepartmentShop(dept) {
   host.innerHTML = filtered.length ? filtered.map(p => `<article class="card"><button class="departmentProductImage" type="button" data-product="${esc(p.id)}"><img src="${esc(imageOrFallback(p.image_url))}" alt="${esc(p.name)}" loading="lazy"></button><div class="cardBody"><div class="muted">${esc(p.category || (isChicken ? "Chicken" : "Solar"))}</div><h3>${esc(p.name)}</h3><p class="departmentCardDescription">${esc(p.description || "")}</p><div class="price">${money(p.price)}</div><div class="stockBadge ${productStock(p)>0?"inStock":"outStock"}">${productStock(p)>0?"● In Stock":"Out of Stock"}</div><button class="primary" type="button" data-product="${esc(p.id)}" ${productStock(p)<1?"disabled":""}>View Details</button></div></article>`).join("") : `<div class="summary"><h3>No ${isChicken?"chicken":"solar"} products available yet</h3><p>New products will appear here when the store owner adds them.</p></div>`;
 }
 
-function ensureSearchResultsStyles() {
-  if (document.getElementById("bigAlienSearchResultsStyles")) return;
-  const style = document.createElement("style");
-  style.id = "bigAlienSearchResultsStyles";
-  style.textContent = `
-    body.search-results-mode #homeView .hero,
-    body.search-results-mode #homeView .strips,
-    body.search-results-mode #homeView #departmentChooser,
-    body.search-results-mode #homeView #departmentShopBar,
-    body.search-results-mode #homeView #recommendedProductsSection,
-    body.search-results-mode #homeView #recentlyViewedSection,
-    body.search-results-mode .cats {
-      display: none !important;
-    }
-    body.search-results-mode #homeView .sectionHead {
-      margin-top: 12px;
-    }
-    body.search-results-mode #homeView #shopTitle {
-      font-size: 1.2rem;
-    }
-    body.search-results-mode #homeView #productGrid {
-      margin-top: 12px;
-    }
-  `;
-  document.head.appendChild(style);
-}
-
 function renderProducts() {
-  ensureSearchResultsStyles();
-  const searchActive = Boolean(String(query || "").trim());
-  document.body.classList.toggle("search-results-mode", searchActive);
-  const shopTitle = $("shopTitle");
-  if (shopTitle && searchActive) shopTitle.textContent = "Search Results";
   const chooser = $("departmentChooser");
   const shopBar = $("departmentShopBar");
   if (chooser) chooser.classList.toggle("hidden", selectedDepartment !== "all");
   if (shopBar) shopBar.classList.toggle("hidden", selectedDepartment === "all");
   const deptNames = { all: "Choose a Department", chicken: "🐔 BIG ALIEN CHICKEN", solar: "☀️ BIG ALIEN SOLAR", general: "🛍️ GENERAL STORE" };
-  if ($("shopTitle")) $("shopTitle").textContent = searchActive ? "Search Results" : (deptNames[selectedDepartment] || "Products");
+  if ($("shopTitle")) $("shopTitle").textContent = deptNames[selectedDepartment] || "Products";
   if ($("departmentShopTitle")) $("departmentShopTitle").textContent = deptNames[selectedDepartment] || "Products";
   let list = products.filter(
     (p) =>
@@ -1530,13 +1498,16 @@ async function openOrders() {
       ? `<div class="orderProducts"><h4>Items in this order</h4>${orderItems.map(item => `<div class="orderProductRow">${item.image_url ? `<img src="${esc(item.image_url)}" alt="${esc(item.product_name)}" loading="lazy" decoding="async">` : `<span class="orderProductPlaceholder">🛍️</span>`}<div class="orderProductDetails"><b>${esc(item.product_name || "Product")}</b><small>Qty: ${Number(item.quantity) || 1}${item.size ? ` · Size: ${esc(item.size)}` : ""}${item.color ? ` · Colour: ${esc(item.color)}` : ""}</small></div><strong>${money((Number(item.product_price) || 0) * (Number(item.quantity) || 1))}</strong></div>`).join("")}</div>`
       : `<div class="orderProducts"><h4>Items in this order</h4><p class="muted">${itemsError ? "Order items are temporarily unavailable." : "No item details were saved for this order."}</p></div>`;
     const normalizedOrderStatus = String(o.order_status || "").trim().toLowerCase().replace(/[_\s-]+/g, " ");
-    const isDelivered = normalizedOrderStatus === "delivered" || String(stage.label).toLowerCase() === "delivered";
+    const isDelivered = normalizedOrderStatus === "delivered" || String(stage.label).trim().toLowerCase() === "delivered";
+    // Keep the category in sync with the status shown on the card. Shipment updates can
+    // mark an order Delivered before an older order_status value has been refreshed.
+    const customerFilterStatus = isDelivered ? "delivered" : normalizedOrderStatus;
     if (isDelivered) {
       const itemSubtotal = orderItems.reduce((sum, item) => sum + (Number(item.product_price) || 0) * (Number(item.quantity) || 0), 0);
       const deliveryFee = Number(o.total || 0) - itemSubtotal;
       const deliveredDate = o.delivered_at || latest?.created_at;
       const deliveredDateText = deliveredDate ? new Date(deliveredDate).toLocaleDateString("en-NG", { day: "numeric", month: "long", year: "numeric" }) : "";
-      html += `<article class="orderCard deliveredOrderCard" data-customer-order="${esc(o.id)}">
+      html += `<article class="orderCard deliveredOrderCard" data-customer-order="${esc(o.id)}" data-order-status="${esc(customerFilterStatus)}">
         <div class="orderCardTop"><div><span class="muted">ORDER NUMBER</span><b class="orderNumber">${esc(o.id.slice(0, 8).toUpperCase())}</b><small class="orderPlacedDate">${o.created_at ? new Date(o.created_at).toLocaleString() : ""}</small></div><span class="orderCurrentBadge deliveredOrderBadge">Delivered</span></div>
         <div class="orderMetaGrid"><div><small>Payment status</small><b class="paymentStatusText">${esc(o.payment_status || "Pending")}</b></div><div><small>Order total</small><b>${money(o.total)}</b></div></div>
         <section class="deliveredConfirmation"><span class="deliveredCheck" aria-hidden="true">✓</span><div><b>Delivered</b><p>Your order was successfully delivered${deliveredDateText ? ` on ${esc(deliveredDateText)}` : ""}.</p></div></section>
@@ -1547,7 +1518,7 @@ async function openOrders() {
         <div class="orderActionRow"><button type="button" class="secondary" data-order-receipt="${esc(o.id)}">Download / Print receipt</button><button type="button" class="primary" data-order-reorder="${esc(o.id)}">Reorder items</button></div>
       </article>`;
     } else {
-      html += `<article class="orderCard" data-customer-order="${esc(o.id)}"><div class="orderCardTop"><div><span class="muted">ORDER NUMBER</span><b class="orderNumber">${esc(o.id.slice(0, 8).toUpperCase())}</b><small class="orderPlacedDate">${o.created_at ? new Date(o.created_at).toLocaleString() : ""}</small></div><span class="orderCurrentBadge">${esc(stage.label)}</span></div><div class="orderMetaGrid"><div><small>Order total</small><b>${money(o.total)}</b></div><div><small>Payment status</small><b class="paymentStatusText">${esc(o.payment_status || "Pending")}</b></div></div>${itemList}${renderOrderTimeline(stage)}<div class="orderInfo"><p><b>Expected delivery:</b> ${esc(expectedDeliveryText(o))}</p><p><b>Tracking number:</b> ${customerTrackingLink(o, updates)}</p><p><b>Delivery address:</b> ${esc(o.delivery_address || "Not available")}</p></div>${returnWindowMarkup(o)}${pickup ? `<div class="pickupNotice"><b>📦 Your item may be ready for collection.</b><p>${esc(latest?.message || "Please check the latest shipment details before travelling to collect it.")}</p></div>` : ""}<div class="shipmentHistory"><h4>Shipment updates</h4>${updates.map((u) => `<div class="shipmentUpdateRow"><span class="shipmentUpdatePin">📍</span><div><b>${esc(u.status || "Update")}</b><p>${esc(u.message || "")}</p><small>${u.created_at ? new Date(u.created_at).toLocaleString() : ""}</small></div></div>`).join("") || `<p class="muted">${updatesError ? "Shipment updates are temporarily unavailable." : "No shipment updates yet. We’ll show new updates here as the store processes your order."}</p>`}</div><div class="orderActionRow"><button type="button" class="secondary" data-order-receipt="${esc(o.id)}">Download / Print receipt</button><button type="button" class="primary" data-order-reorder="${esc(o.id)}">Reorder items</button></div></article>`;
+      html += `<article class="orderCard" data-customer-order="${esc(o.id)}" data-order-status="${esc(customerFilterStatus)}"><div class="orderCardTop"><div><span class="muted">ORDER NUMBER</span><b class="orderNumber">${esc(o.id.slice(0, 8).toUpperCase())}</b><small class="orderPlacedDate">${o.created_at ? new Date(o.created_at).toLocaleString() : ""}</small></div><span class="orderCurrentBadge">${esc(stage.label)}</span></div><div class="orderMetaGrid"><div><small>Order total</small><b>${money(o.total)}</b></div><div><small>Payment status</small><b class="paymentStatusText">${esc(o.payment_status || "Pending")}</b></div></div>${itemList}${renderOrderTimeline(stage)}<div class="orderInfo"><p><b>Expected delivery:</b> ${esc(expectedDeliveryText(o))}</p><p><b>Tracking number:</b> ${customerTrackingLink(o, updates)}</p><p><b>Delivery address:</b> ${esc(o.delivery_address || "Not available")}</p></div>${returnWindowMarkup(o)}${pickup ? `<div class="pickupNotice"><b>📦 Your item may be ready for collection.</b><p>${esc(latest?.message || "Please check the latest shipment details before travelling to collect it.")}</p></div>` : ""}<div class="shipmentHistory"><h4>Shipment updates</h4>${updates.map((u) => `<div class="shipmentUpdateRow"><span class="shipmentUpdatePin">📍</span><div><b>${esc(u.status || "Update")}</b><p>${esc(u.message || "")}</p><small>${u.created_at ? new Date(u.created_at).toLocaleString() : ""}</small></div></div>`).join("") || `<p class="muted">${updatesError ? "Shipment updates are temporarily unavailable." : "No shipment updates yet. We’ll show new updates here as the store processes your order."}</p>`}</div><div class="orderActionRow"><button type="button" class="secondary" data-order-receipt="${esc(o.id)}">Download / Print receipt</button><button type="button" class="primary" data-order-reorder="${esc(o.id)}">Reorder items</button></div></article>`;
     }
   }
   list.innerHTML = html;
@@ -1596,11 +1567,19 @@ async function reorderCustomerOrder(orderId) {
 }
 
 function applyOrderFilter(filter) {
-  document.querySelectorAll("[data-order-filter]").forEach(b => b.classList.toggle("active", b.dataset.orderFilter === filter));
+  document.querySelectorAll("[data-order-filter]").forEach(button => {
+    button.classList.toggle("active", button.dataset.orderFilter === filter);
+  });
+
   document.querySelectorAll("#ordersList .orderCard").forEach(card => {
-    const status = (card.querySelector(".status")?.textContent || "").toLowerCase();
-    const cancelled = /cancel|return|refund/.test(card.textContent.toLowerCase());
-    card.classList.toggle("hidden", filter === "cancelled" ? !cancelled : cancelled);
+    // Classification comes only from the order status saved by the admin.
+    // Do not inspect card text: Delivered cards mention the return window.
+    const status = String(card.dataset.orderStatus || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[_\s-]+/g, " ");
+    const isCancelledOrReturned = /(^|\b)(cancelled|canceled|returned|refunded)(\b|$)/.test(status);
+    card.classList.toggle("hidden", filter === "cancelled" ? !isCancelledOrReturned : isCancelledOrReturned);
   });
 }
 
