@@ -69,8 +69,8 @@ async function setupBigAlienNotifications() {
       );
 
       const registration = await navigator.serviceWorker.register(
-        "/big-alien-shops/firebase-messaging-sw.js",
-        { scope: "/big-alien-shops/" }
+        "/firebase-messaging-sw.js",
+        { scope: "/" }
       );
 
       const messaging = messagingModule.getMessaging(app);
