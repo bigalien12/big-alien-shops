@@ -1451,10 +1451,22 @@ async function loadCustomerSolarInstallments() {
     const paid = rows.filter(x => x.status === "paid").reduce((s,x)=>s+Number(x.amount||0),0);
     const balance = Math.max(0, Number(plan.total_price) - paid);
     return `<article class="summary baInstallmentPlan"><h3>${esc(plan.product_name)}</h3><p>Product price: <b>${money(plan.total_price)}</b></p><p>Deposit: ${money(plan.deposit_amount)} · ${Number(plan.months)} monthly payments</p><p>Paid and verified: <b>${money(paid)}</b> · Remaining: <b>${money(balance)}</b></p><p class="muted">You may pay any amount at any time. Each payment is subject to owner verification.</p>
+      <div class="summary baInstallmentBank"><h4>Bank Transfer Details</h4><p>Account name: <b>Abel Philip</b></p><p>Bank: <b>Moniepoint MFB</b></p><p>Account number: <b id="baInstallmentAccount">6714306196</b> <button class="secondary" type="button" data-copy-ba-account>Copy Account Number</button></p><p class="small">Transfer the amount you entered below, then upload your transfer receipt as payment proof.</p></div>
       <form class="baInstallmentPaymentForm" data-installment-plan="${esc(plan.id)}"><label>Amount you are paying (₦)<input name="amount" type="number" min="1" max="${balance}" step="0.01" required></label><label>Payment proof (image or PDF)<input name="proof" type="file" accept="image/*,application/pdf" required></label><button class="primary" type="submit" ${balance <= 0 ? "disabled" : ""}>Submit payment proof</button><p class="small" aria-live="polite"></p></form>
       <div class="small">${rows.map(x=>`<p>${money(x.amount)} · ${esc(x.status)}${x.admin_note ? ` · ${esc(x.admin_note)}` : ""}</p>`).join("")}</div></article>`;
   }).join("");
 }
+
+document.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-copy-ba-account]");
+  if (!button) return;
+  try {
+    await navigator.clipboard.writeText("6714306196");
+    button.textContent = "Copied!";
+  } catch {
+    window.prompt("Copy this account number:", "6714306196");
+  }
+});
 
 document.addEventListener("submit", async (event) => {
   const form = event.target.closest(".baInstallmentPaymentForm");
