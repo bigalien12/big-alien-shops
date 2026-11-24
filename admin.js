@@ -359,6 +359,10 @@ function openProduct(p, defaultDepartment = "general") {
   $("productStock").value = p?.stock ?? 0;
   $("productDescription").value = p?.description || "";
   $("productPolicy").value = p?.policy || "";
+  if ($("productInstallmentEnabled")) {
+    $("productInstallmentEnabled").checked = p?.department === "solar" && p?.installment_enabled === true;
+    $("productInstallmentSetting")?.classList.toggle("hidden", $("productDepartment").value !== "solar");
+  }
   $("productSizes").value = Array.isArray(p?.sizes) ? p.sizes.join(", ") : "";
   $("productColors").value = Array.isArray(p?.colors)
     ? p.colors.join(", ")
@@ -423,6 +427,7 @@ async function saveProduct(e) {
     stock: Number($("productStock").value),
     description: $("productDescription").value.trim(),
     policy: ["chicken", "solar"].includes($("productDepartment").value) ? $("productPolicy").value.trim() : null,
+    installment_enabled: $("productDepartment").value === "solar" && !!$("productInstallmentEnabled")?.checked,
     sizes: parseList($("productSizes").value),
     colors: parseList($("productColors").value),
   };
@@ -653,6 +658,51 @@ $("adminPasswordForm")?.addEventListener("submit", async (e) => {
   msg.textContent = "Your admin password has been updated successfully.";
 });
 
+async function loadSolarInstallmentsAdmin() {
+  const box = $("adminSolarInstallments"); if (!box || !sb) return;
+  box.innerHTML = '<p class="muted">Loading installment requests and payments…</p>';
+  const [requestsResult, plansResult, paymentsResult] = await Promise.all([
+    sb.from("solar_installment_requests").select("*").order("created_at", {ascending:false}).limit(100),
+    sb.from("solar_installment_plans").select("*").order("created_at", {ascending:false}).limit(100),
+    sb.from("solar_installment_payments").select("*").order("created_at", {ascending:false}).limit(200)
+  ]);
+  const error = requestsResult.error || plansResult.error || paymentsResult.error;
+  if (error) { box.innerHTML = `<div class="summary">${esc(error.message)}<p>Run the supplied SQL setup before using installments.</p></div>`; return; }
+  const requests = requestsResult.data || [], plans = plansResult.data || [], payments = paymentsResult.data || [];
+  const requestHtml = requests.map(r => `<article class="summary"><h3>Request: ${esc(r.product_name)}</h3><p>${money(r.product_price)} · ${esc(r.customer_name || "Customer")} · ${esc(r.customer_phone || "No phone")}</p><p>${esc(r.customer_email || "")} · ${new Date(r.created_at).toLocaleString()}</p><p>Status: <b>${esc(r.status)}</b></p>${r.status === "pending" ? `<form class="baAdminPlanForm" data-request-id="${esc(r.id)}"><label>Deposit amount (₦)<input name="deposit" type="number" min="1" max="${Number(r.product_price)}" required></label><label>Monthly payments after deposit<input name="months" type="number" min="1" max="36" value="6" required></label><label>First monthly due date<input name="first_due_date" type="date" required></label><button class="primary" type="submit">Approve & create plan</button><p class="small"></p></form>` : ""}</article>`).join("");
+  const planHtml = plans.map(p => `<article class="summary"><b>${esc(p.product_name)}</b><p>Customer ${esc(String(p.user_id).slice(0,8))} · Price ${money(p.total_price)} · Deposit ${money(p.deposit_amount)} · ${p.months} monthly payments</p><p>Plan status: ${esc(p.status)}</p></article>`).join("");
+  const paymentHtml = payments.map(p => `<article class="summary"><b>Payment ${money(p.amount)}</b><p>Customer ${esc(String(p.user_id).slice(0,8))} · ${esc(p.status)} · ${new Date(p.created_at).toLocaleString()}</p><button class="secondary" type="button" data-installment-proof="${esc(p.id)}" data-proof-path="${esc(p.proof_path)}">View proof</button>${p.status === "submitted" ? `<button class="primary" type="button" data-installment-paid="${esc(p.id)}">Mark paid</button><button class="secondary" type="button" data-installment-reject="${esc(p.id)}">Reject proof</button>` : ""}</article>`).join("");
+  box.innerHTML = `<h3>Customer requests</h3>${requestHtml || '<p class="muted">No new installment requests.</p>'}<h3>Active plans</h3>${planHtml || '<p class="muted">No installment plans yet.</p>'}<h3>Payment proofs</h3>${paymentHtml || '<p class="muted">No payment proofs submitted.</p>'}`;
+}
+
+document.addEventListener("submit", async (event) => {
+  const form = event.target.closest(".baAdminPlanForm"); if (!form) return;
+  event.preventDefault();
+  const deposit = Number(form.elements.deposit.value), months = Number(form.elements.months.value), due = form.elements.first_due_date.value;
+  const { data: req, error: reqError } = await sb.from("solar_installment_requests").select("*").eq("id", form.dataset.requestId).single();
+  if (reqError || !req || deposit <= 0 || deposit >= Number(req.product_price) || months < 1 || !due) { form.querySelector("p").textContent = reqError?.message || "Check the deposit, number of monthly payments and due date."; return; }
+  const { error } = await sb.from("solar_installment_plans").insert({ request_id:req.id,user_id:req.user_id,product_id:req.product_id,product_name:req.product_name,total_price:req.product_price,deposit_amount:deposit,months,first_due_date:due,status:"active" });
+  if (error) { form.querySelector("p").textContent = error.message; return; }
+  const update = await sb.from("solar_installment_requests").update({status:"approved"}).eq("id",req.id);
+  if (update.error) { form.querySelector("p").textContent = update.error.message; return; }
+  await loadSolarInstallmentsAdmin();
+});
+
+document.addEventListener("click", async (event) => {
+  const b = event.target.closest("button"); if (!b) return;
+  if (b.dataset.installmentPaid || b.dataset.installmentReject) {
+    const id = b.dataset.installmentPaid || b.dataset.installmentReject;
+    const status = b.dataset.installmentPaid ? "paid" : "rejected";
+    const note = status === "rejected" ? (prompt("Reason for rejecting this proof (optional):") || "") : "Payment verified by BIG ALIEN";
+    const { error } = await sb.from("solar_installment_payments").update({status,admin_note:note,verified_at:new Date().toISOString()}).eq("id",id);
+    if (error) alert(error.message); else await loadSolarInstallmentsAdmin();
+  }
+  if (b.dataset.installmentProof) {
+    const { data, error } = await sb.storage.from("solar-installment-proofs").createSignedUrl(b.dataset.proofPath,300);
+    if (error) alert(error.message); else window.open(data.signedUrl,"_blank","noopener");
+  }
+});
+
 document.addEventListener("click", async (e) => {
   const t = e.target.closest("button") || e.target;
   if (t.dataset.readNotification) {
@@ -671,6 +721,8 @@ document.addEventListener("click", async (e) => {
     $("rewardsTab").classList.toggle("hidden", t.dataset.tab !== "rewards");
     $("analyticsTab").classList.toggle("hidden", t.dataset.tab !== "analytics");
     $("settingsTab").classList.toggle("hidden", t.dataset.tab !== "settings");
+    $("installmentsTab")?.classList.toggle("hidden", t.dataset.tab !== "installments");
+    if (t.dataset.tab === "installments") await loadSolarInstallmentsAdmin();
     $("messagesTab").classList.toggle("hidden", t.dataset.tab !== "messages");
     if (t.dataset.tab === "settings") await loadAdminSettings();
     if (t.dataset.tab === "reviews") await loadReviews();
@@ -696,7 +748,7 @@ document.addEventListener("click", async (e) => {
 });
 if ($("adminMessagesBtn"))
   $("adminMessagesBtn").onclick = async () => {
-    ["productsTab", "chickenTab", "solarTab", "ordersTab", "reviewsTab", "rewardsTab", "analyticsTab", "settingsTab"].forEach((id) => $(id)?.classList.add("hidden"));
+    ["productsTab", "chickenTab", "solarTab", "installmentsTab", "ordersTab", "reviewsTab", "rewardsTab", "analyticsTab", "settingsTab"].forEach((id) => $(id)?.classList.add("hidden"));
     $("messagesTab")?.classList.remove("hidden");
     $("adminMessagesPanel")?.classList.remove("hidden");
     document.querySelectorAll("[data-tab]").forEach((x) => x.classList.remove("active"));
@@ -720,6 +772,10 @@ $("productImage")?.addEventListener("change", () => {
         `<img class="preview" style="max-width:90px;margin:4px" src="${URL.createObjectURL( file )}" alt="${esc(file.name)}">`
     )
     .join("");
+});
+$("productDepartment")?.addEventListener("change", () => {
+  $("productInstallmentSetting")?.classList.toggle("hidden", $("productDepartment").value !== "solar");
+  if ($("productDepartment").value !== "solar" && $("productInstallmentEnabled")) $("productInstallmentEnabled").checked = false;
 });
 $("productForm").onsubmit = saveProduct;
 if ($("adminLoginForm"))

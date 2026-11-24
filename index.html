@@ -55,6 +55,9 @@
   .returnWindowNotice p{margin:0}
   .orderInfo a{font-weight:700;text-decoration:underline}
 </style>
+<style id="baSolarInstallmentStyles">
+.baInstallmentOffer,.baInstallmentArea{margin:16px 0;padding:14px;border:1px solid var(--line,#dbe2ea);border-radius:14px;background:var(--surface,#fff)}.baInstallmentOffer h3{margin-top:0}.baInstallmentPlan{margin:12px 0}.baInstallmentPaymentForm{display:grid;gap:10px;margin:12px 0}.baInstallmentPaymentForm input,.baAdminPlanForm input{width:100%;box-sizing:border-box}.baAdminPlanForm{display:grid;gap:9px;max-width:420px;margin-top:12px}.baInstallmentArea h2{font-size:20px}body.dark .baInstallmentOffer,body.dark .baInstallmentArea{background:#111c2d;color:var(--ink)}
+</style>
 </head>
 <body>
 <header class="top">
@@ -188,6 +191,7 @@
   <section id="ordersView" class="hidden">
     <div class="sectionHead"><h2>My Orders</h2></div>
     <div class="orderStatusTabs" role="tablist" aria-label="Order status"><button class="active" type="button" data-order-filter="ongoing">Ongoing / Delivered</button><button type="button" data-order-filter="cancelled">Cancelled / Returned</button></div><div id="ordersList"></div>
+    <section class="baInstallmentArea"><h2>☀️ My Solar Installment Plans</h2><div id="customerSolarInstallments"><p class="muted">Your approved solar payment plans will appear here.</p></div></section>
   </section>
 
   <section id="wishlistView" class="hidden">
@@ -512,7 +516,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<script src="app.js?v=19"></script>
+<script src="app.js?v=20"></script>
 <script>
   document.querySelectorAll('.passwordToggle[data-password-target]').forEach(function(button){
     button.addEventListener('click', function(){

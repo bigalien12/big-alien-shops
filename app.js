@@ -453,6 +453,14 @@ function openProduct(id) {
           </div>
         </div>
 
+        ${p.department === "solar" && p.installment_enabled === true && inStock ? `
+          <section class="productDescription baInstallmentOffer">
+            <h3>💳 Pay in instalments</h3>
+            <p>Ask BIG ALIEN to arrange a deposit and monthly payment plan for this solar generator. You may also make extra payments at any time.</p>
+            <button class="secondary" type="button" id="requestSolarInstallment">Request an installment plan</button>
+            <div id="solarInstallmentRequestMsg" class="small" aria-live="polite"></div>
+          </section>` : ""}
+
         <div class="productActions">
           <button class="primary" id="addToCart" ${!inStock || missingVariantSetup ? "disabled" : ""}>🛒 Add to Cart</button>
           <button class="secondary productBuyNow" id="buyNow" ${!inStock || missingVariantSetup ? "disabled" : ""}>Buy Now</button>
@@ -537,6 +545,22 @@ function openProduct(id) {
       show("checkoutView");
       prefillCheckout();
     }
+  };
+
+  const installmentButton = $("requestSolarInstallment");
+  if (installmentButton) installmentButton.onclick = async () => {
+    const note = $("solarInstallmentRequestMsg");
+    if (!user || !sb) { note.textContent = "Please sign in to request an installment plan."; return; }
+    installmentButton.disabled = true;
+    note.textContent = "Sending your request…";
+    const { data: prof } = await sb.from("profiles").select("full_name,phone").eq("id", user.id).maybeSingle();
+    const { error } = await sb.from("solar_installment_requests").insert({
+      user_id: user.id, product_id: p.id, product_name: p.name,
+      product_price: Number(p.price), customer_name: prof?.full_name || user.user_metadata?.full_name || "",
+      customer_phone: prof?.phone || "", customer_email: user.email || "", status: "pending"
+    });
+    installmentButton.disabled = false;
+    note.textContent = error ? `Could not send request: ${error.message}` : "Request sent. The owner will review it and add your deposit and monthly payment terms.";
   };
 }
 async function loadProductReviews(productId) {
@@ -1428,10 +1452,50 @@ function expectedDeliveryText(order) {
   return Number.isNaN(date.getTime()) ? "Not available yet" : date.toLocaleDateString("en-NG", { dateStyle: "long" });
 }
 
+async function loadCustomerSolarInstallments() {
+  const host = $("customerSolarInstallments");
+  if (!host || !sb || !user) return;
+  const { data: plans, error } = await sb.from("solar_installment_plans").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
+  if (error) { host.innerHTML = `<p class="muted">Installment plans unavailable: ${esc(error.message)}</p>`; return; }
+  if (!plans?.length) { host.innerHTML = '<p class="muted">You do not have an approved solar installment plan yet.</p>'; return; }
+  const paymentResults = await sb.from("solar_installment_payments").select("*").in("plan_id", plans.map(p => p.id)).order("created_at", { ascending: false });
+  const payments = paymentResults.data || [];
+  host.innerHTML = plans.map(plan => {
+    const rows = payments.filter(x => x.plan_id === plan.id);
+    const paid = rows.filter(x => x.status === "paid").reduce((s,x)=>s+Number(x.amount||0),0);
+    const balance = Math.max(0, Number(plan.total_price) - paid);
+    return `<article class="summary baInstallmentPlan"><h3>${esc(plan.product_name)}</h3><p>Product price: <b>${money(plan.total_price)}</b></p><p>Deposit: ${money(plan.deposit_amount)} · ${Number(plan.months)} monthly payments</p><p>Paid and verified: <b>${money(paid)}</b> · Remaining: <b>${money(balance)}</b></p><p class="muted">You may pay any amount at any time. Each payment is subject to owner verification.</p>
+      <form class="baInstallmentPaymentForm" data-installment-plan="${esc(plan.id)}"><label>Amount you are paying (₦)<input name="amount" type="number" min="1" max="${balance}" step="0.01" required></label><label>Payment proof (image or PDF)<input name="proof" type="file" accept="image/*,application/pdf" required></label><button class="primary" type="submit" ${balance <= 0 ? "disabled" : ""}>Submit payment proof</button><p class="small" aria-live="polite"></p></form>
+      <div class="small">${rows.map(x=>`<p>${money(x.amount)} · ${esc(x.status)}${x.admin_note ? ` · ${esc(x.admin_note)}` : ""}</p>`).join("")}</div></article>`;
+  }).join("");
+}
+
+document.addEventListener("submit", async (event) => {
+  const form = event.target.closest(".baInstallmentPaymentForm");
+  if (!form) return;
+  event.preventDefault();
+  const msg = form.querySelector(".small[aria-live]");
+  const amount = Number(form.elements.amount.value);
+  const file = form.elements.proof.files?.[0];
+  if (!file || !amount || amount <= 0 || file.size > 8 * 1024 * 1024) { msg.textContent = "Choose a valid proof file (maximum 8 MB) and payment amount."; return; }
+  const planId = form.dataset.installmentPlan;
+  const { data: plan } = await sb.from("solar_installment_plans").select("id,total_price,user_id").eq("id", planId).eq("user_id", user.id).single();
+  if (!plan) { msg.textContent = "Plan not found."; return; }
+  const ext = (file.name.split(".").pop() || "bin").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const path = `${user.id}/${planId}/${crypto.randomUUID()}.${ext}`;
+  const upload = await sb.storage.from("solar-installment-proofs").upload(path, file, { upsert: false, contentType: file.type });
+  if (upload.error) { msg.textContent = upload.error.message; return; }
+  const { error } = await sb.from("solar_installment_payments").insert({ plan_id: planId, user_id: user.id, amount, proof_path: path, status: "submitted" });
+  if (error) { msg.textContent = error.message; return; }
+  msg.textContent = "Payment proof submitted for owner review.";
+  await loadCustomerSolarInstallments();
+});
+
 async function openOrders() {
   show("ordersView");
   const list = $("ordersList");
   if (!sb || !user || !list) return;
+  loadCustomerSolarInstallments().catch(err => console.warn("Installment plans could not load:", err));
 
   // Render immediately; notifications must not delay the order screen.
   list.innerHTML = `<div class="summary" role="status">Loading your orders…</div>`;

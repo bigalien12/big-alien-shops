@@ -59,7 +59,10 @@
 body.dark .adminLogoutCard{border-color:#7f1d1d}
 body.dark .adminLogoutAction{background:#351b24;color:#fecaca;border-color:#9f3548}
 @media(max-width:600px){.adminSettingsAction,.adminLogoutAction{min-height:58px;padding:13px}.adminSettingsHint{margin-left:0}}
-</style>\n</head>
+</style>\n<style id="baSolarInstallmentStyles">
+.baInstallmentOffer,.baInstallmentArea{margin:16px 0;padding:14px;border:1px solid var(--line,#dbe2ea);border-radius:14px;background:var(--surface,#fff)}.baInstallmentOffer h3{margin-top:0}.baInstallmentPlan{margin:12px 0}.baInstallmentPaymentForm{display:grid;gap:10px;margin:12px 0}.baInstallmentPaymentForm input,.baAdminPlanForm input{width:100%;box-sizing:border-box}.baAdminPlanForm{display:grid;gap:9px;max-width:420px;margin-top:12px}.baInstallmentArea h2{font-size:20px}body.dark .baInstallmentOffer,body.dark .baInstallmentArea{background:#111c2d;color:var(--ink)}
+</style>
+</head>
 <body>
 <header class="top">
   <div class="notice">👑 <b>Big Alien Venture Admin</b> · Owner dashboard</div>
@@ -74,7 +77,7 @@ body.dark .adminLogoutAction{background:#351b24;color:#fecaca;border-color:#9f35
   <section id="denied" class="summary hidden"><h2>Admin access required</h2><p>This account is signed in but does not have the admin role. Ask the store owner to authorize it.</p><button class="secondary" id="deniedLoginAgain" type="button">Use another account</button></section>
   <section id="adminApp" class="hidden">
     <div class="adminTitle"><div><h1>👑 Owner Dashboard</h1><p>Manage products, orders, payments and shipment updates.</p></div></div>
-<div class="adminTabs"><button class="active" data-tab="products">General Products</button><button data-tab="chicken">🐔 Chicken Shop</button><button data-tab="solar">☀️ Solar Shop</button><button data-tab="orders">Orders & Shipment</button><button data-tab="reviews">Customer Reviews</button><button data-tab="rewards">Customer Rewards</button><button data-tab="analytics">📊 Sales Analytics</button><button data-tab="settings">⚙️ Settings</button></div>
+<div class="adminTabs"><button class="active" data-tab="products">General Products</button><button data-tab="chicken">🐔 Chicken Shop</button><button data-tab="solar">☀️ Solar Shop</button><button data-tab="installments">💳 Installments</button><button data-tab="orders">Orders & Shipment</button><button data-tab="reviews">Customer Reviews</button><button data-tab="rewards">Customer Rewards</button><button data-tab="analytics">📊 Sales Analytics</button><button data-tab="settings">⚙️ Settings</button></div>
     <section id="productsTab">
       <div class="departmentAdminIntro generalAdminIntro"><h2>🛍️ General Store Products</h2><p>Manage the regular BIG ALIEN marketplace products here. Chicken and Solar have their own management pages.</p></div>
       <div class="adminActions"><button class="primary" type="button" id="addGeneralProductBtn">➕ Add General Product</button></div>
@@ -90,6 +93,7 @@ body.dark .adminLogoutAction{background:#351b24;color:#fecaca;border-color:#9f35
       <div class="adminActions"><button class="primary" type="button" id="addSolarProductBtn">➕ Add Solar Product</button></div>
       <div id="adminSolarProducts"></div>
     </section>
+    <section id="installmentsTab" class="hidden"><div class="departmentAdminIntro"><h2>💳 Solar Generator Installments</h2><p>Review customer requests, set the deposit and number of monthly payments, and verify each payment proof.</p></div><div id="adminSolarInstallments"></div></section>
     <section id="ordersTab" class="hidden"><div id="adminOrders"></div></section>
     <section id="reviewsTab" class="hidden"><div id="adminReviews"></div></section>
     <section id="rewardsTab" class="hidden"><div id="adminRewards"></div></section>
@@ -114,13 +118,13 @@ body.dark .adminLogoutAction{background:#351b24;color:#fecaca;border-color:#9f35
 </section>
   </section>
 </main>
-<div id="productModal" class="modal hidden"><div class="modalCard"><button class="close" data-close="productModal">×</button><h2 id="productModalTitle">Add Product</h2><form id="productForm"><input id="productId" type="hidden"><label>Product name<input id="productName" required></label><label>Department<select id="productDepartment" required><option value="general">General Store</option><option value="chicken">BIG ALIEN CHICKEN</option><option value="solar">BIG ALIEN SOLAR</option></select></label><label>Category<input id="productCategory" value="Solar" required></label><label>Price (₦)<input id="productPrice" type="number" min="0" required></label><label>Stock<input id="productStock" type="number" min="0" required></label><label>Full product description<textarea id="productDescription" rows="9" placeholder="Write a complete explanation customers should read before ordering."></textarea></label><p class="small muted">This description appears on the customer product page. You can write several paragraphs.</p><div id="productPolicyWrap"><label>Product information &amp; usage policy<textarea id="productPolicy" rows="6" placeholder="Solar: appliances it can power, output limits, usage instructions and policy. Chicken: age, weight, availability and preparation details."></textarea></label><p class="small muted">This information appears underneath the product details for Chicken and Solar products.</p></div><label>Available sizes (for clothes/shoes; separate with commas)<input id="productSizes" placeholder="S, M, L, XL, 40, 41, 42"></label><label>Available colors (separate with commas)<input id="productColors" placeholder="Black, White, Blue"></label><label>Product pictures (select multiple pictures for this one product)<input id="productImage" type="file" accept="image/*" multiple></label><p class="small muted">Select several photos for the same product. The first photo is the main photo.</p><div id="imagePreview"></div><p id="productMsg" class="small"></p><button class="primary" type="submit">Save Product</button></form></div></div>
+<div id="productModal" class="modal hidden"><div class="modalCard"><button class="close" data-close="productModal">×</button><h2 id="productModalTitle">Add Product</h2><form id="productForm"><input id="productId" type="hidden"><label>Product name<input id="productName" required></label><label>Department<select id="productDepartment" required><option value="general">General Store</option><option value="chicken">BIG ALIEN CHICKEN</option><option value="solar">BIG ALIEN SOLAR</option></select></label><label>Category<input id="productCategory" value="Solar" required></label><label>Price (₦)<input id="productPrice" type="number" min="0" required></label><label>Stock<input id="productStock" type="number" min="0" required></label><label>Full product description<textarea id="productDescription" rows="9" placeholder="Write a complete explanation customers should read before ordering."></textarea></label><p class="small muted">This description appears on the customer product page. You can write several paragraphs.</p><div id="productInstallmentSetting" class="summary hidden"><label><input id="productInstallmentEnabled" type="checkbox"> Enable installment requests for this solar generator</label><p class="small muted">Only enable this for solar generator products, not panels, batteries or accessories.</p></div><div id="productPolicyWrap"><label>Product information &amp; usage policy<textarea id="productPolicy" rows="6" placeholder="Solar: appliances it can power, output limits, usage instructions and policy. Chicken: age, weight, availability and preparation details."></textarea></label><p class="small muted">This information appears underneath the product details for Chicken and Solar products.</p></div><label>Available sizes (for clothes/shoes; separate with commas)<input id="productSizes" placeholder="S, M, L, XL, 40, 41, 42"></label><label>Available colors (separate with commas)<input id="productColors" placeholder="Black, White, Blue"></label><label>Product pictures (select multiple pictures for this one product)<input id="productImage" type="file" accept="image/*" multiple></label><p class="small muted">Select several photos for the same product. The first photo is the main photo.</p><div id="imagePreview"></div><p id="productMsg" class="small"></p><button class="primary" type="submit">Save Product</button></form></div></div>
 <div id="orderModal" class="modal hidden"><div class="modalCard"><button class="close" data-close="orderModal">×</button><div id="orderModalBody"></div></div></div>
 <footer>© Big Alien Venture 👽 · Admin dashboard</footer>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<script src="admin.js?v=14"></script>
+<script src="admin.js?v=15"></script>
   <script type="module" src="notifications.js"></script>
 </body>
 </html>
