@@ -456,9 +456,9 @@ function openProduct(id) {
         ${p.department === "solar" && p.installment_enabled === true && inStock ? `
           <section class="productDescription baInstallmentOffer">
             <h3>💳 Pay in instalments</h3>
-            <p>Ask BIG ALIEN to arrange a deposit and monthly payment plan for this solar generator. You may also make extra payments at any time.</p>
-            <button class="secondary" type="button" id="requestSolarInstallment">Request an installment plan</button>
-            <div id="solarInstallmentRequestMsg" class="small" aria-live="polite"></div>
+            <p>Contact BIG ALIEN customer service on WhatsApp to agree your deposit and monthly payment plan for this solar generator.</p>
+            <a class="primary" style="display:inline-flex;text-decoration:none;align-items:center;justify-content:center" target="_blank" rel="noopener" href="https://wa.me/2347025136166?text=${encodeURIComponent(`Hello BIG ALIEN, I am interested in buying ${p.name} (${money(p.price)}) on instalments. Please help me arrange a deposit and payment plan.`)}">Contact customer service for instalments</a>
+            <p class="small">After your plan is approved, customer service will send you a secure link to your installment payment page in the shop.</p>
           </section>` : ""}
 
         <div class="productActions">
@@ -547,21 +547,7 @@ function openProduct(id) {
     }
   };
 
-  const installmentButton = $("requestSolarInstallment");
-  if (installmentButton) installmentButton.onclick = async () => {
-    const note = $("solarInstallmentRequestMsg");
-    if (!user || !sb) { note.textContent = "Please sign in to request an installment plan."; return; }
-    installmentButton.disabled = true;
-    note.textContent = "Sending your request…";
-    const { data: prof } = await sb.from("profiles").select("full_name,phone").eq("id", user.id).maybeSingle();
-    const { error } = await sb.from("solar_installment_requests").insert({
-      user_id: user.id, product_id: p.id, product_name: p.name,
-      product_price: Number(p.price), customer_name: prof?.full_name || user.user_metadata?.full_name || "",
-      customer_phone: prof?.phone || "", customer_email: user.email || "", status: "pending"
-    });
-    installmentButton.disabled = false;
-    note.textContent = error ? `Could not send request: ${error.message}` : "Request sent. The owner will review it and add your deposit and monthly payment terms.";
-  };
+
 }
 async function loadProductReviews(productId) {
   const summary = $("productReviewSummary"), formArea = $("productReviewFormArea"), list = $("productReviewList");
@@ -2230,6 +2216,9 @@ async function init() {
     // Do not throw the customer back to the marketplace during account work.
     if (event === "USER_UPDATED" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") {
       await loadProfile();
+      if (user && new URLSearchParams(window.location.search).has("solar_installment_plan")) {
+        setTimeout(async () => { await openOrders(); document.querySelector(".baInstallmentArea")?.scrollIntoView({ behavior: "smooth", block: "start" }); }, 500);
+      }
       return;
     }
     if (event === "SIGNED_IN" || event === "SIGNED_OUT") {
@@ -2242,6 +2231,9 @@ async function init() {
       }
       show("homeView");
       await loadProducts();
+      if (event === "SIGNED_IN" && new URLSearchParams(window.location.search).has("solar_installment_plan")) {
+        setTimeout(async () => { await openOrders(); document.querySelector(".baInstallmentArea")?.scrollIntoView({ behavior: "smooth", block: "start" }); }, 500);
+      }
     }
   });
   // Paystack redirects back to the store with a transaction reference.

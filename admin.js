@@ -670,7 +670,7 @@ async function loadSolarInstallmentsAdmin() {
   if (error) { box.innerHTML = `<div class="summary">${esc(error.message)}<p>Run the supplied SQL setup before using installments.</p></div>`; return; }
   const requests = requestsResult.data || [], plans = plansResult.data || [], payments = paymentsResult.data || [];
   const requestHtml = requests.map(r => `<article class="summary"><h3>Request: ${esc(r.product_name)}</h3><p>${money(r.product_price)} · ${esc(r.customer_name || "Customer")} · ${esc(r.customer_phone || "No phone")}</p><p>${esc(r.customer_email || "")} · ${new Date(r.created_at).toLocaleString()}</p><p>Status: <b>${esc(r.status)}</b></p>${r.status === "pending" ? `<form class="baAdminPlanForm" data-request-id="${esc(r.id)}"><label>Deposit amount (₦)<input name="deposit" type="number" min="1" max="${Number(r.product_price)}" required></label><label>Monthly payments after deposit<input name="months" type="number" min="1" max="36" value="6" required></label><label>First monthly due date<input name="first_due_date" type="date" required></label><button class="primary" type="submit">Approve & create plan</button><p class="small"></p></form>` : ""}</article>`).join("");
-  const planHtml = plans.map(p => `<article class="summary"><b>${esc(p.product_name)}</b><p>Customer ${esc(String(p.user_id).slice(0,8))} · Price ${money(p.total_price)} · Deposit ${money(p.deposit_amount)} · ${p.months} monthly payments</p><p>Plan status: ${esc(p.status)}</p></article>`).join("");
+  const planHtml = plans.map(p => { const payLink = `${window.location.origin}/?solar_installment_plan=${encodeURIComponent(p.id)}`; return `<article class="summary"><b>${esc(p.product_name)}</b><p>Customer ${esc(String(p.user_id).slice(0,8))} · Price ${money(p.total_price)} · Deposit ${money(p.deposit_amount)} · ${p.months} monthly payments</p><p>Plan status: ${esc(p.status)}</p><button class="secondary" type="button" data-copy-installment-link="${esc(payLink)}">Copy customer payment link</button></article>`; }).join("");
   const paymentHtml = payments.map(p => `<article class="summary"><b>Payment ${money(p.amount)}</b><p>Customer ${esc(String(p.user_id).slice(0,8))} · ${esc(p.status)} · ${new Date(p.created_at).toLocaleString()}</p><button class="secondary" type="button" data-installment-proof="${esc(p.id)}" data-proof-path="${esc(p.proof_path)}">View proof</button>${p.status === "submitted" ? `<button class="primary" type="button" data-installment-paid="${esc(p.id)}">Mark paid</button><button class="secondary" type="button" data-installment-reject="${esc(p.id)}">Reject proof</button>` : ""}</article>`).join("");
   box.innerHTML = `<h3>Customer requests</h3>${requestHtml || '<p class="muted">No new installment requests.</p>'}<h3>Active plans</h3>${planHtml || '<p class="muted">No installment plans yet.</p>'}<h3>Payment proofs</h3>${paymentHtml || '<p class="muted">No payment proofs submitted.</p>'}`;
 }
@@ -690,6 +690,10 @@ document.addEventListener("submit", async (event) => {
 
 document.addEventListener("click", async (event) => {
   const b = event.target.closest("button"); if (!b) return;
+  if (b.dataset.copyInstallmentLink) {
+    try { await navigator.clipboard.writeText(b.dataset.copyInstallmentLink); alert("Customer installment link copied. Send it to the customer on WhatsApp."); }
+    catch { prompt("Copy this customer installment link:", b.dataset.copyInstallmentLink); }
+  }
   if (b.dataset.installmentPaid || b.dataset.installmentReject) {
     const id = b.dataset.installmentPaid || b.dataset.installmentReject;
     const status = b.dataset.installmentPaid ? "paid" : "rejected";
